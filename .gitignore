@@ -1,0 +1,57 @@
+# Entorno virtual
+venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Base de datos local
+db.sqlite3
+db.sqlite3-journal
+
+# Archivos de entorno
+.env
+.env.*
+*.env
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de logs
+*.log
+
+# Archivos temporales
+*.swp
+*.swo
+*.tmp
+
+# VS Code
+.vscode/
+
+# PyCharm
+.idea/
+
+# Archivos estáticos compilados
+staticfiles/
+
+# Media (opcional, depende del proyecto)
+media/
+
+# Coverage
+htmlcov/
+.coverage
+.cache
+.pytest_cache/
+
+# Migrations cache (opcional, NO ignorar migrations reales)
+**/__pycache__/
+
+# Docker (si luego lo usas)
+*.pid
+*.seed
+*.out
+*.err
