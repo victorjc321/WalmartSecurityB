@@ -3,9 +3,14 @@ Django==6.0.2
 django-cors-headers==4.9.0
 django-filter==25.2
 djangorestframework==3.16.1
+djangorestframework_simplejwt==5.5.1
 dotenv==0.9.9
 Markdown==3.10.2
 mysqlclient==2.2.8
+pillow==12.1.1
 psycopg2-binary==2.9.11
+PyJWT==2.12.1
+pyotp==2.9.0
 python-dotenv==1.2.1
+qrcode==8.2
 sqlparse==0.5.5

@@ -1,9 +1,21 @@
 from django.db import models
 from django.core.validators import MinValueValidator
+import pyotp
+from django.contrib.auth.models import User
+
 from decimal import Decimal
 import uuid
 
+class UserTOTP(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    totp_secret = models.CharField(max_length=32)
+    is_configured = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"TOTP - {self.user.username}"
+        
 # Create your models here.
+
 class InventoryItem(models.Model):
     item_id = models.UUIDField(
     primary_key=True,
