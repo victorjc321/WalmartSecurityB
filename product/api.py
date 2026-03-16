@@ -57,27 +57,23 @@ def login_view(request):
     username = request.data.get('username')
     password = request.data.get('password')
 
-    # 1. Valida credenciales
     user = authenticate(username=username, password=password)
     if not user:
         return Response({'error': 'Credenciales incorrectas'}, status=400)
 
-    # 2. Busca o crea el TOTP del usuario
     totp_obj, created = UserTOTP.objects.get_or_create(
         user=user,
         defaults={'totp_secret': pyotp.random_base32()}
     )
 
-    # 3. ¿Ya configuró la app?
     if not totp_obj.is_configured:
-        # Primera vez — genera el QR
+ 
         totp = pyotp.TOTP(totp_obj.totp_secret)
         uri = totp.provisioning_uri(
             name=user.username,
             issuer_name="Walmart México"
         )
 
-        # Convierte el QR a base64 para mandarlo al front
         img = qrcode.make(uri)
         buffer = io.BytesIO()
         img.save(buffer, format='PNG')
@@ -89,7 +85,6 @@ def login_view(request):
             'mensaje': 'Escanea el QR con Google Authenticator'
         })
 
-    # Ya configuró — pide el código TOTP
     return Response({
         'step': 'verify',
         'mensaje': 'Ingresa el código de tu app autenticadora'
@@ -107,19 +102,18 @@ def verificar_totp_view(request):
     except:
         return Response({'error': 'Usuario no encontrado'}, status=400)
 
-    # Valida el código TOTP
     totp = pyotp.TOTP(totp_obj.totp_secret)
     if not totp.verify(codigo):
         return Response({'error': 'Código incorrecto o expirado'}, status=400)
 
-    # Si era el setup, marca como configurado
+
     if not totp_obj.is_configured:
         totp_obj.is_configured = True
         totp_obj.save()
 
-    # Genera el JWT
     refresh = RefreshToken.for_user(user)
     return Response({
         'access': str(refresh.access_token),
         'refresh': str(refresh),
     })
+    #.....................................................
