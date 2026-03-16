@@ -9,10 +9,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import authenticate
-from django.contrib.auth.models import User
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import logout as django_logout
+from django.contrib.auth.models import User
 from .models import InventoryItem, UserTOTP
 from .serializers import InventoryItemSerializer
 
