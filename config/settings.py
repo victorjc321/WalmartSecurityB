@@ -18,6 +18,8 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# Discord Webhook URL
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 
 # Application definition
 

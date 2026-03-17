@@ -3,7 +3,8 @@ import qrcode
 import io
 import base64
 from rest_framework import viewsets, permissions
-from rest_framework.decorators import api_view
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.decorators import api_view,authentication_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.authentication import JWTAuthentication 
@@ -14,7 +15,7 @@ from django.contrib.auth import logout as django_logout
 from django.contrib.auth.models import User
 from .models import InventoryItem, UserTOTP
 from .serializers import InventoryItemSerializer, LoginSerializer, TOTPVerifySerializer
-
+from .discord_logger import enviar_discord
 
 def registrar_log(user, accion, objeto):
     """Registra una acción en el log de Django Admin"""
@@ -91,9 +92,12 @@ def login_view(request):
     )
 
 @api_view(["POST"])
+@authentication_classes([JWTAuthentication])
+@permission_classes([IsAuthenticated])
 def logout_view(request):
 
-    django_logout(request)
+    mensaje = f"LOGOUT\nUsuario: {request.user.username}"
+    enviar_discord(mensaje, 15548997)
 
     return Response({"message": "Sesión cerrada correctamente"}, status=200)
 
@@ -122,6 +126,10 @@ def verificar_totp_view(request):
         totp_obj.save()
 
     refresh = RefreshToken.for_user(user)
+
+    mensaje = f"LOGIN\nUsuario: {user.username}"
+    enviar_discord(mensaje, 5763719)
+
     return Response(
         {
             "access": str(refresh.access_token),
