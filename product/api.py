@@ -6,6 +6,7 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.authentication import JWTAuthentication 
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import authenticate
@@ -17,18 +18,20 @@ from .serializers import InventoryItemSerializer
 
 def registrar_log(user, accion, objeto):
     """Registra una acción en el log de Django Admin"""
-    LogEntry.objects.log_action(
+    LogEntry.objects.create(
         user_id=user.id,
         content_type_id=ContentType.objects.get_for_model(InventoryItem).pk,
-        object_id=objeto.pk,
-        object_repr=str(objeto),
+        object_id=str(objeto.pk),
+        object_repr=str(objeto)[:200],
         action_flag=accion,
+        change_message='',
     )
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
+    authentication_classes = [JWTAuthentication] 
     permission_classes = [permissions.AllowAny]
 
     def perform_create(self, serializer):
