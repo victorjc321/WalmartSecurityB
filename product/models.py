@@ -13,7 +13,6 @@ class UserTOTP(models.Model):
         return f"TOTP - {self.user.username}"
         
 # Create your models here.
-
 class InventoryItem(models.Model):
     item_id = models.UUIDField(
     primary_key=True,
@@ -42,3 +41,6 @@ class InventoryItem(models.Model):
     class Meta:
         db_table = "inventory_asset"
         ordering = ["-created_at"]
+    
+    def __str__(self):
+        return self.product_name 

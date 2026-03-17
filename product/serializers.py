@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import InventoryItem
 import re
 
+# Serializador para el modelo InventoryItem (CRUD)
 class InventoryItemSerializer(serializers.ModelSerializer):
     class Meta:
         model = InventoryItem
@@ -145,3 +146,50 @@ class InventoryItemSerializer(serializers.ModelSerializer):
                 )
 
         return attrs
+
+# Serializer para el login inicial (username y password)
+class LoginSerializer(serializers.Serializer):
+
+    username = serializers.CharField(
+        max_length=150,
+        trim_whitespace=True
+    )
+
+    password = serializers.CharField(
+        max_length=128,
+        write_only=True
+    )
+
+    # valida y sanitiza username
+    def validate_username(self, value):
+
+        value = value.strip()
+
+        if len(value) < 3:
+            raise serializers.ValidationError("Formato inválido.")
+
+        patron = r"^[a-zA-Z0-9._@+-]+$"
+        if not re.match(patron, value):
+            raise serializers.ValidationError("Formato inválido.")
+
+        return value
+
+# Serializer para verificar el código TOTP
+class TOTPVerifySerializer(serializers.Serializer):
+
+    username = serializers.CharField(
+        max_length=150,
+        trim_whitespace=True
+    )
+
+    codigo = serializers.CharField(
+        max_length=6,
+        min_length=6
+    )
+
+    def validate_codigo(self, value):
+
+        if not value.isdigit():
+            raise serializers.ValidationError("Código inválido.")
+
+        return value

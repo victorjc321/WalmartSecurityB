@@ -13,7 +13,7 @@ from django.contrib.auth import authenticate
 from django.contrib.auth import logout as django_logout
 from django.contrib.auth.models import User
 from .models import InventoryItem, UserTOTP
-from .serializers import InventoryItemSerializer
+from .serializers import InventoryItemSerializer, LoginSerializer, TOTPVerifySerializer
 
 
 def registrar_log(user, accion, objeto):
@@ -50,13 +50,15 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-# Autenticación TOTP----------------------------
-
-
+# Autenticación TOTP
 @api_view(["POST"])
 def login_view(request):
-    username = request.data.get("username")
-    password = request.data.get("password")
+
+    serializer = LoginSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    username = serializer.validated_data["username"]
+    password = serializer.validated_data["password"]
 
     user = authenticate(username=username, password=password)
     if not user:
@@ -88,7 +90,6 @@ def login_view(request):
         {"step": "verify", "mensaje": "Ingresa el código de tu app autenticadora"}
     )
 
-
 @api_view(["POST"])
 def logout_view(request):
 
@@ -99,8 +100,12 @@ def logout_view(request):
 
 @api_view(["POST"])
 def verificar_totp_view(request):
-    username = request.data.get("username")
-    codigo = request.data.get("codigo")
+
+    serializer = TOTPVerifySerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    username = serializer.validated_data["username"]
+    codigo = serializer.validated_data["codigo"]
 
     try:
         user = User.objects.get(username=username)
@@ -123,4 +128,3 @@ def verificar_totp_view(request):
             "refresh": str(refresh),
         }
     )
-    # .....................................................
