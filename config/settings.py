@@ -83,6 +83,10 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
+         "OPTIONS": {
+            "connect_timeout": 5,       
+            "options": "-c statement_timeout=5000"  
+        }
     }
 }
 # ── Errores genéricos via DRF ──
