@@ -3,11 +3,13 @@ from .models import InventoryItem
 from django.core.validators import RegexValidator
 import unicodedata
 
-def normalize_text(value):
-    # limpia espacios y normaliza unicode
+def sanitize_text(value):
+    # normaliza unicode y limpia espacios
     return unicodedata.normalize("NFKC", value).strip()
 
+
 class InventoryItemSerializer(serializers.ModelSerializer):
+
     product_name = serializers.CharField(
         min_length=3,
         max_length=255,
@@ -45,8 +47,8 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         read_only_fields = ('item_id', 'created_at', 'updated_at')
 
     def validate_product_name(self, value):
-        # evita duplicados y normaliza
-        value = normalize_text(value)
+        # sanitiza + evita duplicados
+        value = sanitize_text(value)
 
         query = InventoryItem.objects.filter(product_name__iexact=value)
 
@@ -59,6 +61,11 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        # bloquea campos extra enviados manualmente
+        extra = set(self.initial_data.keys()) - set(self.fields.keys())
+        if extra:
+            raise serializers.ValidationError("Campos no permitidos.")
+
         # valida relación precio-stock
         price = attrs.get("unit_price")
         stock = attrs.get("quantity_in_stock")
@@ -70,6 +77,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
                 )
 
         return attrs
+
 
 class LoginSerializer(serializers.Serializer):
 
@@ -93,8 +101,9 @@ class LoginSerializer(serializers.Serializer):
     )
 
     def validate_username(self, value):
-        # limpia y normaliza
-        return normalize_text(value)
+        # sanitiza username
+        return sanitize_text(value)
+
 
 class TOTPVerifySerializer(serializers.Serializer):
 
@@ -110,5 +119,5 @@ class TOTPVerifySerializer(serializers.Serializer):
     )
 
     def validate_username(self, value):
-        # limpia y normaliza
-        return normalize_text(value)
+        # sanitiza username
+        return sanitize_text(value)
