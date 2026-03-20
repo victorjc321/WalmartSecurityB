@@ -1,11 +1,46 @@
 from rest_framework import serializers
 from .models import InventoryItem
 from django.core.validators import RegexValidator
+from django.contrib.auth import authenticate
 import unicodedata
+import re
+
+
+# patrones peligrosos: SQL injection, XSS, ejecución de código
+DANGEROUS_PATTERNS = re.compile(
+    r"(--|;|/\*|\*/|xp_|"
+    r"UNION\s+SELECT|DROP\s+TABLE|"
+    r"INSERT\s+INTO|DELETE\s+FROM|"
+    r"ALTER\s+TABLE|CREATE\s+TABLE|TRUNCATE|"
+    r"<script|</script|javascript:|vbscript:|"
+    r"on\w+\s*=|data:\s*text/html|"
+    r"eval\s*\(|exec\s*\(|system\s*\(|"
+    r"__import__|subprocess|os\.system|"
+    r"base64\s*,|\\x[0-9a-fA-F]{2})",
+    re.IGNORECASE
+)
+
+
+def contains_dangerous_patterns(value: str) -> bool:
+    return bool(DANGEROUS_PATTERNS.search(value))
+
 
 def sanitize_text(value):
     # normaliza unicode y limpia espacios
-    return unicodedata.normalize("NFKC", value).strip()
+    value = unicodedata.normalize("NFKC", value).strip()
+
+    # bloquea patrones peligrosos
+    if contains_dangerous_patterns(value):
+        raise serializers.ValidationError("Entrada no permitida.")
+
+    return value
+
+
+# validador compartido para username
+USERNAME_VALIDATOR = RegexValidator(
+    regex=r"^[a-zA-Z0-9._@+-]+$",
+    message="Formato inválido."
+)
 
 
 class InventoryItemSerializer(serializers.ModelSerializer):
@@ -16,7 +51,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         trim_whitespace=True,
         validators=[
             RegexValidator(
-                regex=r"^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑ\s\-\(\)\.]+$",
+                regex=r"^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s\-\(\)\.]+$",
                 message="El nombre contiene caracteres no permitidos."
             )
         ]
@@ -85,12 +120,7 @@ class LoginSerializer(serializers.Serializer):
         min_length=3,
         max_length=150,
         trim_whitespace=True,
-        validators=[
-            RegexValidator(
-                regex=r"^[a-zA-Z0-9._@+-]+$",
-                message="Formato inválido."
-            )
-        ]
+        validators=[USERNAME_VALIDATOR]
     )
 
     password = serializers.CharField(
@@ -104,13 +134,38 @@ class LoginSerializer(serializers.Serializer):
         # sanitiza username
         return sanitize_text(value)
 
+    def validate_password(self, value):
+        # el password tiene más libertad de caracteres, se revisa por separado
+        if contains_dangerous_patterns(value):
+            raise serializers.ValidationError("Entrada no permitida.")
+        return value
+
+    def validate(self, attrs):
+        # bloquea campos extra enviados manualmente
+        extra = set(self.initial_data.keys()) - set(self.fields.keys())
+        if extra:
+            raise serializers.ValidationError("Campos no permitidos.")
+
+        # mismo mensaje para usuario inexistente y contraseña incorrecta, evita enumeración
+        user = authenticate(
+            username=attrs.get("username"),
+            password=attrs.get("password")
+        )
+
+        if not user or not user.is_active:
+            raise serializers.ValidationError("Credenciales inválidas.")
+
+        attrs["user"] = user
+        return attrs
+
 
 class TOTPVerifySerializer(serializers.Serializer):
 
     username = serializers.CharField(
         min_length=3,
         max_length=150,
-        trim_whitespace=True
+        trim_whitespace=True,
+        validators=[USERNAME_VALIDATOR]
     )
 
     codigo = serializers.RegexField(
@@ -121,3 +176,11 @@ class TOTPVerifySerializer(serializers.Serializer):
     def validate_username(self, value):
         # sanitiza username
         return sanitize_text(value)
+
+    def validate(self, attrs):
+        # bloquea campos extra enviados manualmente
+        extra = set(self.initial_data.keys()) - set(self.fields.keys())
+        if extra:
+            raise serializers.ValidationError("Campos no permitidos.")
+
+        return attrs
