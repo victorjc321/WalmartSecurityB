@@ -103,6 +103,12 @@ DATABASES = {
 # ── Errores genéricos via DRF ──
 
 REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ] if ENVIRONMENT == "production" else [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "product.authentication.CookieJWTAuthentication",
     ),
