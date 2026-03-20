@@ -2,7 +2,8 @@ from django.db import models
 from django.core.validators import MinValueValidator
 import pyotp
 from django.contrib.auth.models import User
-
+from django.utils.timezone import now
+from datetime import timedelta
 from decimal import Decimal
 import uuid
 
@@ -33,3 +34,49 @@ class InventoryItem(models.Model):
     class Meta:
         db_table = "inventory_asset"
         ordering = ["-created_at"]
+
+
+from django.db import models
+
+
+class BlockedIP(models.Model):
+    ip = models.GenericIPAddressField(unique=True)
+    reason = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.ip
+
+
+class FailedLoginAttempt(models.Model):
+    ip = models.GenericIPAddressField(unique=True)
+    attempts = models.IntegerField(default=0)
+    last_attempt = models.DateTimeField(auto_now=True)
+    is_blocked = models.BooleanField(default=False)
+    blocked_until = models.DateTimeField(null=True, blank=True)
+
+    def is_currently_blocked(self):
+        if self.is_blocked and self.blocked_until:
+            if now() >= self.blocked_until:
+                # 🔄 desbloqueo automático
+                self.is_blocked = False
+                self.attempts = 0
+                self.blocked_until = None
+                self.save()
+                return False
+            return True
+        return False
+
+    def apply_block(self):
+        if self.attempts >= 15:
+            self.blocked_until = now() + timedelta(hours=1)
+        elif self.attempts >= 10:
+            self.blocked_until = now() + timedelta(minutes=30)
+        elif self.attempts >= 5:
+            self.blocked_until = now() + timedelta(minutes=10)
+
+        self.is_blocked = True
+
+    def __str__(self):
+        return f"{self.ip} - {self.attempts}"

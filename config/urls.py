@@ -8,6 +8,7 @@ from product.api import (
     logout_view,
     RefreshView,
     csrf_view,
+    logout_all_view,
 )
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -24,6 +25,7 @@ urlpatterns = [
     path("csrf/", csrf_view),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("refresh/", RefreshView.as_view()),
+    path("logout-all/", logout_all_view),
     path(
         "api/docs/",
         SpectacularSwaggerView.as_view(url_name="schema"),

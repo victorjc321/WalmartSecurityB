@@ -17,8 +17,14 @@ from .models import InventoryItem, UserTOTP
 from .serializers import InventoryItemSerializer
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.views import APIView
+from .models import FailedLoginAttempt
+from django.utils.timezone import now
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.token_blacklist.models import (
+    OutstandingToken,
+    BlacklistedToken,
+)
 
 
 def registrar_log(user, accion, objeto):
@@ -53,14 +59,54 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
+from .models import FailedLoginAttempt
+from django.utils.timezone import now
+from datetime import timedelta
+
+
 @api_view(["POST"])
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
 
+    ip = request.META.get("REMOTE_ADDR")
+
+    attempt, created = FailedLoginAttempt.objects.get_or_create(ip=ip)
+
     user = authenticate(username=username, password=password)
+
+    if attempt.is_currently_blocked() and not user:
+        return Response(
+            {"error": f"IP bloqueada hasta {attempt.blocked_until}"}, status=403
+        )
+
     if not user:
-        return Response({"error": "Credenciales incorrectas"}, status=400)
+        attempt.attempts += 1
+        attempt.last_attempt = now()
+
+        max_attempts = 5
+        remaining = max_attempts - attempt.attempts
+
+        if attempt.attempts >= 5:
+            attempt.apply_block()
+            attempt.save()
+
+            return Response(
+                {"error": "IP bloqueada", "blocked_until": attempt.blocked_until},
+                status=403,
+            )
+
+        attempt.save()
+
+        return Response(
+            {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
+            status=400,
+        )
+
+    attempt.attempts = 0
+    attempt.is_blocked = False
+    attempt.blocked_until = None
+    attempt.save()
 
     totp_obj, created = UserTOTP.objects.get_or_create(
         user=user, defaults={"totp_secret": pyotp.random_base32()}
@@ -91,7 +137,39 @@ def login_view(request):
 
 @api_view(["POST"])
 def logout_view(request):
-    response = Response({"message": "Sesión cerrada correctamente"})
+    refresh_token = request.COOKIES.get("refresh_token")
+
+    if refresh_token:
+        try:
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+        except:
+            pass
+
+    response = Response({"message": "Logout exitoso"})
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
+
+    return response
+
+
+from rest_framework_simplejwt.token_blacklist.models import (
+    OutstandingToken,
+    BlacklistedToken,
+)
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def logout_all_view(request):
+    user = request.user
+
+    tokens = OutstandingToken.objects.filter(user=user)
+
+    for token in tokens:
+        BlacklistedToken.objects.get_or_create(token=token)
+
+    response = Response({"message": "Sesiones cerradas en todos los dispositivos"})
 
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
