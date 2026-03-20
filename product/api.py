@@ -2,6 +2,7 @@ import pyotp
 import qrcode
 import io
 import base64
+from .discord_logger import enviar_discord
 from django.utils.timezone import now
 from datetime import timedelta
 from rest_framework import viewsets, permissions
@@ -27,7 +28,6 @@ from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
     BlacklistedToken,
 )
-
 
 def registrar_log(user, accion, objeto):
     """Registra una acción en el log de Django Admin"""
@@ -147,15 +147,7 @@ def logout_view(request):
     response = Response({"message": "Logout exitoso"})
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
-
     return response
-
-
-from rest_framework_simplejwt.token_blacklist.models import (
-    OutstandingToken,
-    BlacklistedToken,
-)
-
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -219,6 +211,10 @@ def verificar_totp_view(request):
         samesite="Lax",  # ⚠️Poner en None antes de subir
         max_age=60 * 60 * 24,
     )
+
+    # Notificacion del login a discord
+    mensaje = f"LOGIN\nUsuario: {user.username}"
+    enviar_discord(mensaje, 5763719)
 
     return response
 
