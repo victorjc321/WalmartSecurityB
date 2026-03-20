@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'corsheaders',
     'product',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -107,6 +108,13 @@ REST_FRAMEWORK = {
         'anon': '20/minute',   # peticiones anónimas
         'user': '100/minute',  # peticiones autenticadas
     },
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Walmart México - API de Inventario',
+    'DESCRIPTION': 'API REST para gestión de inventario de productos',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
 }
 # ── Límite de tamaño  ──
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024  # 1 MB
