@@ -2,6 +2,8 @@ import pyotp
 import qrcode
 import io
 import base64
+from django.utils.timezone import now
+from datetime import timedelta
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -13,7 +15,7 @@ from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import logout as django_logout
-from .models import InventoryItem, UserTOTP
+from .models import InventoryItem, UserTOTP, FailedLoginAttempt
 from .serializers import InventoryItemSerializer
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.views import APIView
@@ -58,12 +60,6 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
             registrar_log(self.request.user, DELETION, instance)
         instance.delete()
 
-
-from .models import FailedLoginAttempt
-from django.utils.timezone import now
-from datetime import timedelta
-
-
 @api_view(["POST"])
 def login_view(request):
     username = request.data.get("username")
@@ -74,7 +70,9 @@ def login_view(request):
     attempt, created = FailedLoginAttempt.objects.get_or_create(ip=ip)
 
     user = authenticate(username=username, password=password)
-
+    #---------------------------------------------------------------
+    # NOTA: INTERCAMBIAR EL ORDEN DEL IF Y USER EN PRODUCCION
+    #---------------------------------------------------------------
     if attempt.is_currently_blocked() and not user:
         return Response(
             {"error": f"IP bloqueada hasta {attempt.blocked_until}"}, status=403
