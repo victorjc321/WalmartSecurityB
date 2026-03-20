@@ -13,8 +13,11 @@ urlpatterns = [
     path("api/login/", login_view),
     path("api/verificar-totp/", verificar_totp_view),
     path("api/logout/", logout_view),
-    
-    # documentación de endpoints
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
-    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    # No se espanten pues victor
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path(
+        "api/docs/",
+        SpectacularSwaggerView.as_view(url_name="schema"),
+        name="swagger-ui",
+    ),
 ]
