@@ -55,3 +55,6 @@ htmlcov/
 *.seed
 *.out
 *.err
+
+# Certificados de seguridad
+global-bundle.pem

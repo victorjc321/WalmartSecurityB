@@ -76,7 +76,7 @@ for var in required_vars:
     if not os.getenv(var):
         raise ValueError(f"Variable de entorno {var} no está configurada")
     
-DATABASES = {
+DATABASES = {  
     'default': {
         "ENGINE": os.getenv("DB_ENGINE"),
         "NAME": os.getenv("DB_NAME"),
@@ -84,9 +84,10 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
-         "OPTIONS": {
+        "OPTIONS": {
+            "sslmode": "verify-full",
+            "sslrootcert": os.path.join(BASE_DIR, "global-bundle.pem"),
             "connect_timeout": 5,       
-            "options": "-c statement_timeout=5000"  
         }
     }
 }
