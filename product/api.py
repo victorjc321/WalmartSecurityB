@@ -3,36 +3,38 @@ import qrcode
 import io
 import base64
 from rest_framework import viewsets, permissions
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.decorators import api_view,authentication_classes, permission_classes
+from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
-from rest_framework_simplejwt.authentication import JWTAuthentication 
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import authenticate
-from django.contrib.auth import logout as django_logout
 from django.contrib.auth.models import User
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from django.contrib.auth import logout as django_logout
 from .models import InventoryItem, UserTOTP
-from .serializers import InventoryItemSerializer, LoginSerializer, TOTPVerifySerializer
-from .discord_logger import enviar_discord
+from .serializers import InventoryItemSerializer
+from django.views.decorators.csrf import ensure_csrf_cookie
+from rest_framework.views import APIView
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.exceptions import TokenError
+
 
 def registrar_log(user, accion, objeto):
     """Registra una acción en el log de Django Admin"""
-    LogEntry.objects.create(
+    LogEntry.objects.log_action(
         user_id=user.id,
         content_type_id=ContentType.objects.get_for_model(InventoryItem).pk,
-        object_id=str(objeto.pk),
-        object_repr=str(objeto)[:200],
+        object_id=objeto.pk,
+        object_repr=str(objeto),
         action_flag=accion,
-        change_message='',
     )
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
-    authentication_classes = [JWTAuthentication] 
     permission_classes = [permissions.AllowAny]
 
     def perform_create(self, serializer):
@@ -51,15 +53,10 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-# Autenticación TOTP
 @api_view(["POST"])
 def login_view(request):
-
-    serializer = LoginSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-
-    username = serializer.validated_data["username"]
-    password = serializer.validated_data["password"]
+    username = request.data.get("username")
+    password = request.data.get("password")
 
     user = authenticate(username=username, password=password)
     if not user:
@@ -91,25 +88,21 @@ def login_view(request):
         {"step": "verify", "mensaje": "Ingresa el código de tu app autenticadora"}
     )
 
+
 @api_view(["POST"])
-@authentication_classes([JWTAuthentication])
-@permission_classes([IsAuthenticated])
 def logout_view(request):
+    response = Response({"message": "Sesión cerrada correctamente"})
 
-    mensaje = f"LOGOUT\nUsuario: {request.user.username}"
-    enviar_discord(mensaje, 15548997)
+    response.delete_cookie("access_token")
+    response.delete_cookie("refresh_token")
 
-    return Response({"message": "Sesión cerrada correctamente"}, status=200)
+    return response
 
 
 @api_view(["POST"])
 def verificar_totp_view(request):
-
-    serializer = TOTPVerifySerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
-
-    username = serializer.validated_data["username"]
-    codigo = serializer.validated_data["codigo"]
+    username = request.data.get("username")
+    codigo = request.data.get("codigo")
 
     try:
         user = User.objects.get(username=username)
@@ -126,13 +119,87 @@ def verificar_totp_view(request):
         totp_obj.save()
 
     refresh = RefreshToken.for_user(user)
+    access_token = str(refresh.access_token)
+    refresh_token = str(refresh)
 
-    mensaje = f"LOGIN\nUsuario: {user.username}"
-    enviar_discord(mensaje, 5763719)
+    response = Response({"message": "Login exitoso"})
 
-    return Response(
-        {
-            "access": str(refresh.access_token),
-            "refresh": str(refresh),
-        }
+    # 🍪 Access token
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,  # ⚠️ en local pon False
+        samesite="Lax",  # ⚠️Poner en None antes de subir
+        max_age=60 * 10,
     )
+
+    # 🍪 Refresh token
+    response.set_cookie(
+        key="refresh_token",
+        value=refresh_token,
+        httponly=True,
+        secure=False,  # ⚠️ en local pon False
+        samesite="Lax",  # ⚠️Poner en None antes de subir
+        max_age=60 * 60 * 24,
+    )
+
+    return response
+
+
+@api_view(["GET"])
+@ensure_csrf_cookie
+def csrf_view(request):
+    return Response({"message": "CSRF cookie set"})
+
+
+class RefreshView(APIView):
+    def post(self, request):
+        refresh_token = request.COOKIES.get("refresh_token")
+
+        if not refresh_token:
+            return Response({"error": "No refresh token"}, status=401)
+
+        serializer = TokenRefreshSerializer(data={"refresh": refresh_token})
+
+        try:
+            serializer.is_valid(raise_exception=True)
+
+            access_token = serializer.validated_data["access"]
+            new_refresh = serializer.validated_data.get("refresh")
+
+            response = Response({"message": "Token renovado"})
+
+            # 🍪 Access token
+            response.set_cookie(
+                key="access_token",
+                value=access_token,
+                httponly=True,
+                secure=False,  # ⚠️ en local pon False
+                samesite="Lax",  # ⚠️Poner en None antes de subir
+                max_age=60 * 10,
+            )
+
+            # 🍪 Refresh ROTADO
+            if new_refresh:
+                response.set_cookie(
+                    key="refresh_token",
+                    value=new_refresh,
+                    httponly=True,
+                    secure=False,  # ⚠️ en local pon False
+                    samesite="Lax",  # ⚠️Poner en None antes de subir
+                    max_age=60 * 60 * 24,
+                )
+
+            return response
+
+        except TokenError:
+            print("⚠️ POSIBLE ROBO DE TOKEN DETECTADO")
+
+            response = Response({"error": "Sesión comprometida"}, status=401)
+
+            # 🔥 eliminar cookies
+            response.delete_cookie("access_token")
+            response.delete_cookie("refresh_token")
+
+            return response

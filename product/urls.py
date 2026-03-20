@@ -3,5 +3,5 @@ from .api import InventoryItemViewSet
 
 router = routers.DefaultRouter()
 
-router.register(r'inventory', InventoryItemViewSet, basename='inventory')
+router.register(r"inventory", InventoryItemViewSet, basename="inventory")
 urlpatterns = router.urls
