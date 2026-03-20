@@ -207,11 +207,17 @@ CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ("'none'",),
         "connect-src": ("'self'", "http://localhost:5173", "http://127.0.0.1:5173"),
-        "script-src": ("'self'",),
-        "style-src": ("'self'",),
-        "img-src": ("'self'", "data:"),
+        "script-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
+        "style-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
+        "img-src": ("'self'", "data:", "https://cdn.jsdelivr.net"),
         "font-src": ("'self'",),
         "frame-ancestors": ("'none'",),
+        "connect-src": (
+            "'self'",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://cdn.jsdelivr.net",
+        ),
     }
 }
 
