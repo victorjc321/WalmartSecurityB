@@ -191,43 +191,6 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 
 # evita que el navegador adivine el tipo de archivo
 SECURE_CONTENT_TYPE_NOSNIFF = True
-# evita que la app sea embebida en un iframe de otro sitio
-X_FRAME_OPTIONS = "DENY"
+X_FRAME_OPTIONS = 'DENY'
 SECURE_BROWSER_XSS_FILTER = True
-
-# default 'none', todo bloqueado menos lo que se especifica
-CONTENT_SECURITY_POLICY = {
-    "DIRECTIVES": {
-        "default-src": ("'none'",),
-        "connect-src": ("'self'", "http://localhost:5173", "http://127.0.0.1:5173"),
-        "script-src": ("'self'",),
-        "style-src": ("'self'",),
-        "img-src": ("'self'", "data:"),
-        "font-src": ("'self'",),
-        "frame-ancestors": ("'none'",),
-    }
-}
-
-# ── HTTPS y cookies seguras: solo en producción ──
-# en local no hay HTTPS, activar estos settings lo rompería
-if ENVIRONMENT == "production":
-    # redirige HTTP → HTTPS automáticamente
-    SECURE_SSL_REDIRECT = True
-
-    # Django corre detrás de Nginx en producción
-    # este header le dice a Django que la petición original era HTTPS
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-
-    # HSTS: el navegador recuerda usar solo HTTPS por 1 año
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
-    SECURE_HSTS_PRELOAD = True
-
-    # cookies solo viajan por HTTPS, nunca por HTTP plano
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-
-    # Igual se define en el .env cuando ya este en produccion (ruta del vue)
-    FRONTEND_URL = os.getenv("FRONTEND_URL", "")
-    if FRONTEND_URL:
-        CSP_CONNECT_SRC += (FRONTEND_URL,)
+CONTENT_SECURITY_POLICY = "frame-ancestors 'none'" 
