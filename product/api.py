@@ -1,6 +1,7 @@
 import pyotp
 import qrcode
 import io
+from datetime import timedelta
 import base64
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view
@@ -21,6 +22,8 @@ from .models import FailedLoginAttempt
 from django.utils.timezone import now
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
 from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
     BlacklistedToken,
@@ -59,11 +62,6 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
-from .models import FailedLoginAttempt
-from django.utils.timezone import now
-from datetime import timedelta
-
-
 @api_view(["POST"])
 def login_view(request):
     username = request.data.get("username")
@@ -71,38 +69,42 @@ def login_view(request):
 
     ip = request.META.get("REMOTE_ADDR")
 
-    attempt, created = FailedLoginAttempt.objects.get_or_create(ip=ip)
+    attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip)
+
+    if attempt.is_currently_blocked():
+        return Response(
+            {"error": "IP bloqueada", "blocked_until": attempt.blocked_until},
+            status=403,
+        )
 
     user = authenticate(username=username, password=password)
 
-    if attempt.is_currently_blocked() and not user:
-        return Response(
-            {"error": f"IP bloqueada hasta {attempt.blocked_until}"}, status=403
-        )
-
     if not user:
         attempt.attempts += 1
-        attempt.last_attempt = now()
 
-        max_attempts = 5
-        remaining = max_attempts - attempt.attempts
+        # 🔥 BLOQUEOS PROGRESIVOS
+        if attempt.attempts == 5:
+            attempt.blocked_until = now() + timedelta(minutes=10)
+            attempt.is_blocked = True
 
-        if attempt.attempts >= 5:
-            attempt.apply_block()
-            attempt.save()
+        elif attempt.attempts == 10:
+            attempt.blocked_until = now() + timedelta(minutes=30)
+            attempt.is_blocked = True
 
-            return Response(
-                {"error": "IP bloqueada", "blocked_until": attempt.blocked_until},
-                status=403,
-            )
+        elif attempt.attempts == 15:
+            attempt.blocked_until = now() + timedelta(hours=1)
+            attempt.is_blocked = True
 
         attempt.save()
+
+        remaining = max(0, 5 - attempt.attempts)
 
         return Response(
             {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
             status=400,
         )
 
+    # ✅ LOGIN CORRECTO → RESET
     attempt.attempts = 0
     attempt.is_blocked = False
     attempt.blocked_until = None
@@ -133,6 +135,12 @@ def login_view(request):
     return Response(
         {"step": "verify", "mensaje": "Ingresa el código de tu app autenticadora"}
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def check_session(request):
+    return Response({"authenticated": True})
 
 
 @api_view(["POST"])
@@ -225,8 +233,8 @@ def verificar_totp_view(request):
     return response
 
 
-@api_view(["GET"])
 @ensure_csrf_cookie
+@api_view(["GET"])
 def csrf_view(request):
     return Response({"message": "CSRF cookie set"})
 

@@ -131,6 +131,7 @@ SPECTACULAR_SETTINGS = {
 # ── Límite de tamaño ──
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024  # 1 MB
 FILE_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
 
 
 # Password validation
@@ -171,7 +172,8 @@ CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "https://tudominio.com"]
 CORS_ALLOW_CREDENTIALS = True
-MIDDLEWARE.insert(0, "product.middleware.BlockIPMiddleware")
+
+MIDDLEWARE.insert(0, "product.middleware.SecurityMiddleware")
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
