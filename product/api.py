@@ -32,15 +32,7 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, Bl
 # ─────────────────────────────────────────
 # Log del admin
 # ─────────────────────────────────────────
-
-def registrar_log(user, accion, objeto):
-    LogEntry.objects.log_action(
-        user_id=user.id,
-        content_type_id=ContentType.objects.get_for_model(InventoryItem).pk,
-        object_id=objeto.pk,
-        object_repr=str(objeto),
-        action_flag=accion,
-    )
+    
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def mi_rol_view(request):
@@ -53,6 +45,15 @@ def mi_rol_view(request):
         "is_empleado": "Empleado" in grupos,
     })
 
+def registrar_log(user, accion, objeto):
+    LogEntry.objects.create(
+        user_id=user.id,
+        content_type=ContentType.objects.get_for_model(InventoryItem),
+        object_id=str(objeto.pk),
+        object_repr=str(objeto)[:200],
+        action_flag=accion,
+        change_message=""
+    )
 # ─────────────────────────────────────────
 # CRUD de inventario
 # ─────────────────────────────────────────
