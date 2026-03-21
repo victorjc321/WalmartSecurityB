@@ -106,12 +106,16 @@ DATABASES = {
 # ── Errores genéricos via DRF ──
 
 REST_FRAMEWORK = {
-    "DEFAULT_RENDERER_CLASSES": [
-        "rest_framework.renderers.JSONRenderer",
-    ] if ENVIRONMENT == "production" else [
-        "rest_framework.renderers.JSONRenderer",
-        "rest_framework.renderers.BrowsableAPIRenderer",
-    ],
+    "DEFAULT_RENDERER_CLASSES": (
+        [
+            "rest_framework.renderers.JSONRenderer",
+        ]
+        if ENVIRONMENT == "production"
+        else [
+            "rest_framework.renderers.JSONRenderer",
+            "rest_framework.renderers.BrowsableAPIRenderer",
+        ]
+    ),
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "product.authentication.CookieJWTAuthentication",
     ),
@@ -123,8 +127,10 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "20/minute",
-        "user": "100/minute",
+        "anon": "2/minute",
+        "user": "10/minute",
+         'ip': '60/minute',       
+         'login': '3/minute', 
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -139,6 +145,7 @@ SPECTACULAR_SETTINGS = {
 
 # ── Límite de tamaño ──
 DATA_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024  # 1 MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
 
 
@@ -158,7 +165,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
+# CAMBIAR UNOS PUNTOS A TRUE ANTES DE PRODUCCION
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
     "REFRESH_TOKEN_LIFETIME": timedelta(minutes=30),
@@ -180,7 +187,8 @@ CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
 
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "https://tudominio.com"]
 CORS_ALLOW_CREDENTIALS = True
-MIDDLEWARE.insert(0, "product.middleware.BlockIPMiddleware")
+
+MIDDLEWARE.insert(0, "product.middleware.SecurityMiddleware")
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
@@ -200,9 +208,9 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 
 # evita que el navegador adivine el tipo de archivo
 SECURE_CONTENT_TYPE_NOSNIFF = True
-X_FRAME_OPTIONS = 'DENY'
+X_FRAME_OPTIONS = "DENY"
 SECURE_BROWSER_XSS_FILTER = True
-CONTENT_SECURITY_POLICY = "frame-ancestors 'none'" 
+CONTENT_SECURITY_POLICY = "frame-ancestors 'none'"
 
 
 # default 'none', todo bloqueado menos lo que se especifica
