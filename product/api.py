@@ -332,6 +332,19 @@ def verificar_totp_view(request):
         return Response(
             {"error": "Código incorrecto", "intentos": attempts}, status=400
         )
+    # aunque el código sea correcto, si está bloqueado no entra
+    totp_attempt.refresh_from_db()
+    if totp_attempt.is_blocked and totp_attempt.blocked_until:
+        if timezone.now() < totp_attempt.blocked_until:
+            return Response(
+                {"error": "Acceso temporalmente restringido"},
+                status=403,
+            )
+
+    totp_attempt.attempts = 0
+    totp_attempt.is_blocked = False
+    totp_attempt.blocked_until = None
+    totp_attempt.save()
 
     request.session.pop("pre_2fa_user", None)
     request.session.pop("otp_attempts", None)
