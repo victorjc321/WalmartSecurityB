@@ -3,6 +3,7 @@ import qrcode
 import io
 import base64
 from datetime import timedelta
+from .permissions import PermisoInventario, PermisoBulk 
 from .permissions import PermisoInventario
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
@@ -371,3 +372,57 @@ class RefreshView(APIView):
             response.delete_cookie("access_token")
             response.delete_cookie("refresh_token")
             return response
+        
+# ─────────────────────────────────────────
+# Bulk Delete — Solo Admin
+# ─────────────────────────────────────────
+
+class BulkDeleteView(APIView):
+    """
+    DELETE /inventory/bulk/
+    Elimina múltiples productos por ID.
+    Solo Admin activo puede ejecutarlo.
+    """
+    permission_classes = [PermisoBulk]
+    throttle_classes = [IPRateThrottle, UserRateThrottle]
+
+    def delete(self, request):
+        ids = request.data.get("ids", [])
+
+
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"error": "Se requiere una lista de IDs"},
+                status=400
+            )
+
+   
+        if len(ids) > 20:
+            return Response(
+                {"error": "Máximo 20 productos por operación"},
+                status=400
+            )
+
+
+        items = InventoryItem.objects.filter(item_id__in=ids)
+
+        if not items.exists():
+            return Response(
+                {"error": "Ningún producto encontrado"},
+                status=404
+            )
+
+ 
+        for item in items:
+            registrar_log(request.user, DELETION, item)
+
+        count = items.count()
+        items.delete()
+
+        mensaje = f"BULK DELETE\nAdmin: {request.user.username}\nEliminados: {count} productos"
+        enviar_discord(mensaje, 15158332)
+
+        return Response(
+            {"message": f"{count} productos eliminados"},
+            status=200
+        )
