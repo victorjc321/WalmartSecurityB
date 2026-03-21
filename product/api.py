@@ -3,8 +3,7 @@ import qrcode
 import io
 import base64
 from datetime import timedelta
-from .permissions import PermisoInventario, PermisoBulk 
-from .permissions import PermisoInventario
+from .permissions import PermisoInventario, PermisoBulk
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
 from django.utils import timezone
@@ -22,8 +21,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.debug import sensitive_variables, sensitive_post_parameters
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
-from .throttles import IPRateThrottle, LoginRateThrottle
-from .throttles import IPRateThrottle, LoginRateThrottle
+from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from rest_framework.throttling import UserRateThrottle
 from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt
 from .serializers import InventoryItemSerializer
@@ -110,7 +108,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
-@throttle_classes([LoginRateThrottle])
+@throttle_classes([IPRateThrottle, LoginRateThrottle])
 @sensitive_variables('password')
 def login_view(request):
     username = request.data.get("username")
@@ -145,7 +143,6 @@ def login_view(request):
             status=400,
         )
 
-    # ── Login correcto — resetea intentos ──
     attempt.attempts = 0
     attempt.is_blocked = False
     attempt.blocked_until = None
@@ -182,6 +179,7 @@ def login_view(request):
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([AuthSessionThrottle])
 def check_session(request):
     return Response({"authenticated": True})
 
@@ -191,6 +189,7 @@ def check_session(request):
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
+@throttle_classes([AuthSessionThrottle])
 def logout_view(request):
     refresh_token = request.COOKIES.get("refresh_token")
 
@@ -227,7 +226,7 @@ def logout_all_view(request):
 # ─────────────────────────────────────────
 
 @api_view(["POST"])
-@throttle_classes([LoginRateThrottle])
+@throttle_classes([IPRateThrottle, LoginRateThrottle])
 @sensitive_variables('codigo')
 def verificar_totp_view(request):
     username = request.data.get("username")
@@ -378,11 +377,7 @@ class RefreshView(APIView):
 # ─────────────────────────────────────────
 
 class BulkDeleteView(APIView):
-    """
-    DELETE /inventory/bulk/
-    Elimina múltiples productos por ID.
-    Solo Admin activo puede ejecutarlo.
-    """
+    
     permission_classes = [PermisoBulk]
     throttle_classes = [IPRateThrottle, UserRateThrottle]
 

@@ -130,11 +130,13 @@ REST_FRAMEWORK = {
         "anon": "2/minute",
         "user": "10/minute",
          'ip': '60/minute',       
-         'login': '3/minute', 
+         'login': '3/minute',
+         'auth_session': '10/minute',
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
+TRUSTED_PROXY = ENVIRONMENT == "production"
 
 SPECTACULAR_SETTINGS = {
     "TITLE": "Walmart México - API de Inventario",
