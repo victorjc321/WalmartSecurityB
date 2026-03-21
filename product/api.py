@@ -1,41 +1,38 @@
 import pyotp
 import qrcode
 import io
-from datetime import timedelta
 import base64
+from datetime import timedelta
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
+from django.utils import timezone
 from rest_framework import viewsets, permissions
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view, throttle_classes, permission_classes
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import authenticate
 from django.contrib.auth.models import User
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
-from django.contrib.auth import logout as django_logout
-from .models import InventoryItem, UserTOTP, FailedLoginAttempt
-from .serializers import InventoryItemSerializer
-from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.views import APIView
-from .models import FailedLoginAttempt
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.debug import sensitive_variables, sensitive_post_parameters
-from django.utils.timezone import now
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
-from django.http import JsonResponse
-from .discord_logger import enviar_discord
-from django.contrib.auth.decorators import login_required
-from rest_framework_simplejwt.token_blacklist.models import (
-    OutstandingToken,
-    BlacklistedToken,
-)
+from .throttles import IPRateThrottle, LoginRateThrottle
+from .throttles import IPRateThrottle, LoginRateThrottle
+from rest_framework.throttling import UserRateThrottle
+from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt
+from .serializers import InventoryItemSerializer
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
 
+
+# ─────────────────────────────────────────
+# Log del admin
+# ─────────────────────────────────────────
 
 def registrar_log(user, accion, objeto):
-    """Registra una acción en el log de Django Admin"""
     LogEntry.objects.log_action(
         user_id=user.id,
         content_type_id=ContentType.objects.get_for_model(InventoryItem).pk,
@@ -45,10 +42,15 @@ def registrar_log(user, accion, objeto):
     )
 
 
+# ─────────────────────────────────────────
+# CRUD de inventario
+# ─────────────────────────────────────────
+
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [IPRateThrottle, UserRateThrottle]
 
     def perform_create(self, serializer):
         obj = serializer.save()
@@ -66,19 +68,24 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 
+# ─────────────────────────────────────────
+# Login
+# ─────────────────────────────────────────
+
 @api_view(["POST"])
+@throttle_classes([LoginRateThrottle])
 @sensitive_variables('password')
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
 
     ip = request.META.get("REMOTE_ADDR")
-
     attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip)
 
+    # ── Verifica bloqueo ANTES de autenticar ──
     if attempt.is_currently_blocked():
         return Response(
-            {"error": "IP bloqueada", "blocked_until": attempt.blocked_until},
+            {"error": "Acceso temporalmente restringido"},
             status=403,
         )
 
@@ -87,29 +94,21 @@ def login_view(request):
     if not user:
         attempt.attempts += 1
 
-        # 🔥 BLOQUEOS PROGRESIVOS
-        if attempt.attempts == 5:
-            attempt.blocked_until = now() + timedelta(minutes=10)
-            attempt.is_blocked = True
-
-        elif attempt.attempts == 10:
-            attempt.blocked_until = now() + timedelta(minutes=30)
-            attempt.is_blocked = True
-
-        elif attempt.attempts == 15:
-            attempt.blocked_until = now() + timedelta(hours=1)
-            attempt.is_blocked = True
+        if attempt.attempts >= 3:
+            attempt.apply_block()
+            attempt.save()
+            return Response(
+                {"error": "Acceso temporalmente restringido"},
+                status=403,
+            )
 
         attempt.save()
-
-        remaining = max(0, 5 - attempt.attempts)
-
         return Response(
-            {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
+            {"error": "Credenciales incorrectas"},
             status=400,
         )
 
-    # LOGIN CORRECTO → RESET
+    # ── Login correcto — resetea intentos ──
     attempt.attempts = 0
     attempt.is_blocked = False
     attempt.blocked_until = None
@@ -120,7 +119,6 @@ def login_view(request):
     )
 
     if not totp_obj.is_configured:
-
         totp = pyotp.TOTP(totp_obj.totp_secret)
         uri = totp.provisioning_uri(name=user.username, issuer_name="Walmart México")
 
@@ -129,24 +127,31 @@ def login_view(request):
         img.save(buffer, format="PNG")
         qr_base64 = base64.b64encode(buffer.getvalue()).decode()
 
-        return Response(
-            {
-                "step": "setup",
-                "qr": qr_base64,
-                "mensaje": "Escanea el QR con Google Authenticator",
-            }
-        )
+        return Response({
+            "step": "setup",
+            "qr": qr_base64,
+            "mensaje": "Escanea el QR con una Authenticator",
+        })
 
-    return Response(
-        {"step": "verify", "mensaje": "Ingresa el código de tu app autenticadora"}
-    )
+    return Response({
+        "step": "verify",
+        "mensaje": "Ingresa el código de autenticación"
+    })
 
+
+# ─────────────────────────────────────────
+# Verificar sesión
+# ─────────────────────────────────────────
 
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def check_session(request):
     return Response({"authenticated": True})
 
+
+# ─────────────────────────────────────────
+# Logout
+# ─────────────────────────────────────────
 
 @api_view(["POST"])
 def logout_view(request):
@@ -169,22 +174,24 @@ def logout_view(request):
 @permission_classes([IsAuthenticated])
 def logout_all_view(request):
     user = request.user
-
     tokens = OutstandingToken.objects.filter(user=user)
 
     for token in tokens:
         BlacklistedToken.objects.get_or_create(token=token)
 
     response = Response({"message": "Sesiones cerradas en todos los dispositivos"})
-
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
-
     return response
 
 
+# ─────────────────────────────────────────
+# Verificar TOTP
+# ─────────────────────────────────────────
+
 @api_view(["POST"])
-@sensitive_variables('codigo', 'totp_secret')
+@throttle_classes([LoginRateThrottle])
+@sensitive_variables('codigo')
 def verificar_totp_view(request):
     username = request.data.get("username")
     codigo = request.data.get("codigo")
@@ -193,11 +200,51 @@ def verificar_totp_view(request):
         user = User.objects.get(username=username)
         totp_obj = UserTOTP.objects.get(user=user)
     except:
-        return Response({"error": "Usuario no encontrado"}, status=400)
+        return Response(
+            {"error": "Acceso temporalmente restringido"}, status=400
+        )
+
+    totp_attempt, created = FailedTOTPAttempt.objects.get_or_create(user=user)
+
+    # ── Verifica bloqueo por usuario ANTES de validar ──
+    if totp_attempt.is_currently_blocked():
+        return Response(
+            {"error": "Acceso temporalmente restringido"},
+            status=403,
+        )
 
     totp = pyotp.TOTP(totp_obj.totp_secret)
     if not totp.verify(codigo):
-        return Response({"error": "Código incorrecto o expirado"}, status=400)
+        totp_attempt.attempts += 1
+
+        if totp_attempt.attempts >= 3:
+            totp_attempt.apply_block()
+            totp_attempt.save()
+            return Response(
+                {"error": "Acceso temporalmente restringido"},
+                status=403,
+            )
+
+        totp_attempt.save()
+        return Response(
+            {"error": "Código incorrecto o expirado"},
+            status=400,
+        )
+
+    # ── Recarga desde BD para verificar si quedó bloqueado ──
+    totp_attempt.refresh_from_db()
+
+    if totp_attempt.is_currently_blocked():
+        return Response(
+            {"error": "Acceso temporalmente restringido"},
+            status=403,
+        )
+
+   
+    totp_attempt.attempts = 0
+    totp_attempt.is_blocked = False
+    totp_attempt.blocked_until = None
+    totp_attempt.save()
 
     if not totp_obj.is_configured:
         totp_obj.is_configured = True
@@ -209,35 +256,36 @@ def verificar_totp_view(request):
 
     response = Response({"message": "Login exitoso"})
 
-    # 🍪 Access token
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # en local pon False
-        samesite="Lax",  # Poner en None antes de subir
+        secure=False,
+        samesite="Lax",
         max_age=60 * 10,
     )
 
-    # 🍪 Refresh token
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,  # en local pon False
-        samesite="Lax",  # Poner en None antes de subir
+        secure=False,
+        samesite="Lax",
         max_age=60 * 60 * 24,
     )
 
-    # Notificacion del login a discord
     mensaje = f"LOGIN\nUsuario: {user.username}"
     enviar_discord(mensaje, 5763719)
 
     return response
 
 
-@ensure_csrf_cookie
+# ─────────────────────────────────────────
+# CSRF y Refresh
+# ─────────────────────────────────────────
+
 @api_view(["GET"])
+@ensure_csrf_cookie
 def csrf_view(request):
     return Response({"message": "CSRF cookie set"})
 
@@ -260,24 +308,22 @@ class RefreshView(APIView):
 
             response = Response({"message": "Token renovado"})
 
-            # 🍪 Access token
             response.set_cookie(
                 key="access_token",
                 value=access_token,
                 httponly=True,
-                secure=False,  # ⚠️ en local pon False
-                samesite="Lax",  # ⚠️Poner en None antes de subir
+                secure=False,
+                samesite="Lax",
                 max_age=60 * 10,
             )
 
-            # 🍪 Refresh ROTADO
             if new_refresh:
                 response.set_cookie(
                     key="refresh_token",
                     value=new_refresh,
                     httponly=True,
-                    secure=False,  # ⚠️ en local pon False
-                    samesite="Lax",  # ⚠️Poner en None antes de subir
+                    secure=False,
+                    samesite="Lax",
                     max_age=60 * 60 * 24,
                 )
 
@@ -285,11 +331,7 @@ class RefreshView(APIView):
 
         except TokenError:
             print("⚠️ POSIBLE ROBO DE TOKEN DETECTADO")
-
             response = Response({"error": "Sesión comprometida"}, status=401)
-
-            # 🔥 eliminar cookies
             response.delete_cookie("access_token")
             response.delete_cookie("refresh_token")
-
             return response
