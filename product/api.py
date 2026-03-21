@@ -3,6 +3,7 @@ import qrcode
 import io
 import base64
 from datetime import timedelta
+from .permissions import PermisoInventario, PermisoBulk 
 from .permissions import PermisoInventario
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
@@ -32,15 +33,7 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, Bl
 # ─────────────────────────────────────────
 # Log del admin
 # ─────────────────────────────────────────
-
-def registrar_log(user, accion, objeto):
-    LogEntry.objects.log_action(
-        user_id=user.id,
-        content_type_id=ContentType.objects.get_for_model(InventoryItem).pk,
-        object_id=objeto.pk,
-        object_repr=str(objeto),
-        action_flag=accion,
-    )
+    
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def mi_rol_view(request):
@@ -53,30 +46,63 @@ def mi_rol_view(request):
         "is_empleado": "Empleado" in grupos,
     })
 
+def registrar_log(user, accion, objeto):
+    LogEntry.objects.create(
+        user_id=user.id,
+        content_type=ContentType.objects.get_for_model(InventoryItem),
+        object_id=str(objeto.pk),
+        object_repr=str(objeto)[:200],
+        action_flag=accion,
+        change_message=""
+    )
 # ─────────────────────────────────────────
 # CRUD de inventario
 # ─────────────────────────────────────────
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
-    queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
     throttle_classes = [IPRateThrottle, UserRateThrottle]
     permission_classes = [PermisoInventario]
+
+    def get_queryset(self):
+        user = self.request.user
+
+
+        if not user or not user.is_authenticated:
+            return InventoryItem.objects.none()
+
+        if not user.groups.exists():
+            return InventoryItem.objects.none()
+
+        return InventoryItem.objects.all()
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()  
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+ 
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()  
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        if request.user.is_authenticated:
+            registrar_log(request.user, CHANGE, obj)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()  
+        if request.user.is_authenticated:
+            registrar_log(request.user, DELETION, instance)
+        instance.delete()
+        return Response(status=204)
 
     def perform_create(self, serializer):
         obj = serializer.save()
         if self.request.user.is_authenticated:
             registrar_log(self.request.user, ADDITION, obj)
-
-    def perform_update(self, serializer):
-        obj = serializer.save()
-        if self.request.user.is_authenticated:
-            registrar_log(self.request.user, CHANGE, obj)
-
-    def perform_destroy(self, instance):
-        if self.request.user.is_authenticated:
-            registrar_log(self.request.user, DELETION, instance)
-        instance.delete()
 
 
 # ─────────────────────────────────────────
@@ -346,3 +372,57 @@ class RefreshView(APIView):
             response.delete_cookie("access_token")
             response.delete_cookie("refresh_token")
             return response
+        
+# ─────────────────────────────────────────
+# Bulk Delete — Solo Admin
+# ─────────────────────────────────────────
+
+class BulkDeleteView(APIView):
+    """
+    DELETE /inventory/bulk/
+    Elimina múltiples productos por ID.
+    Solo Admin activo puede ejecutarlo.
+    """
+    permission_classes = [PermisoBulk]
+    throttle_classes = [IPRateThrottle, UserRateThrottle]
+
+    def delete(self, request):
+        ids = request.data.get("ids", [])
+
+
+        if not ids or not isinstance(ids, list):
+            return Response(
+                {"error": "Se requiere una lista de IDs"},
+                status=400
+            )
+
+   
+        if len(ids) > 20:
+            return Response(
+                {"error": "Máximo 20 productos por operación"},
+                status=400
+            )
+
+
+        items = InventoryItem.objects.filter(item_id__in=ids)
+
+        if not items.exists():
+            return Response(
+                {"error": "Ningún producto encontrado"},
+                status=404
+            )
+
+ 
+        for item in items:
+            registrar_log(request.user, DELETION, item)
+
+        count = items.count()
+        items.delete()
+
+        mensaje = f"BULK DELETE\nAdmin: {request.user.username}\nEliminados: {count} productos"
+        enviar_discord(mensaje, 15158332)
+
+        return Response(
+            {"message": f"{count} productos eliminados"},
+            status=200
+        )

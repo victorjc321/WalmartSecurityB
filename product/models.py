@@ -27,6 +27,9 @@ class InventoryItem(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def __str__(self):
+        return f"{self.product_name} (ID: {self.item_id})"
+
     class Meta:
         db_table = "inventory_asset"
         ordering = ["-created_at"]

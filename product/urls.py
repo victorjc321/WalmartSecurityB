@@ -1,7 +1,22 @@
-from rest_framework import routers
+from django.urls import path
 from .api import InventoryItemViewSet
+from .api import InventoryItemViewSet, BulkDeleteView
 
-router = routers.DefaultRouter()
+inventory_list = InventoryItemViewSet.as_view({
+    'get': 'list',       # Empleado, Gerente, Admin
+    'post': 'create',    # Gerente, Admin
+})
 
-router.register(r"inventory", InventoryItemViewSet, basename="inventory")
-urlpatterns = router.urls
+inventory_detail = InventoryItemViewSet.as_view({
+    'get': 'retrieve',   
+    'patch': 'partial_update',  
+    'delete': 'destroy', # Solo Admin
+   
+    
+})
+
+urlpatterns = [
+    path('inventory/', inventory_list, name='inventory-list'),
+    path('inventory/<uuid:pk>/', inventory_detail, name='inventory-detail'),
+    path('inventory/bulk/', BulkDeleteView.as_view(), name='inventory-bulk-delete'),
+]
