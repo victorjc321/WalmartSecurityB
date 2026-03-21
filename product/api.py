@@ -3,6 +3,7 @@ import qrcode
 import io
 import base64
 from datetime import timedelta
+from .permissions import PermisoInventario
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
 from django.utils import timezone
@@ -40,7 +41,17 @@ def registrar_log(user, accion, objeto):
         object_repr=str(objeto),
         action_flag=accion,
     )
-
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def mi_rol_view(request):
+    grupos = list(request.user.groups.values_list("name", flat=True))
+    return Response({
+        "username": request.user.username,
+        "roles": grupos,
+        "is_admin": "Admin" in grupos,
+        "is_gerente": "Gerente" in grupos,
+        "is_empleado": "Empleado" in grupos,
+    })
 
 # ─────────────────────────────────────────
 # CRUD de inventario
@@ -49,8 +60,8 @@ def registrar_log(user, accion, objeto):
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
-    permission_classes = [permissions.AllowAny]
     throttle_classes = [IPRateThrottle, UserRateThrottle]
+    permission_classes = [PermisoInventario]
 
     def perform_create(self, serializer):
         obj = serializer.save()
@@ -330,7 +341,7 @@ class RefreshView(APIView):
             return response
 
         except TokenError:
-            print("⚠️ POSIBLE ROBO DE TOKEN DETECTADO")
+            print("⚠️POSIBLE ROBO DE TOKEN DETECTADO")
             response = Response({"error": "Sesión comprometida"}, status=401)
             response.delete_cookie("access_token")
             response.delete_cookie("refresh_token")
