@@ -92,10 +92,13 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
+        "CONN_MAX_AGE": 60,
         "OPTIONS": {
             "sslmode": "verify-full",
             "sslrootcert": os.path.join(BASE_DIR, "global-bundle.pem"),
             "connect_timeout": 5,
+            # CAMBIAR EL TIEMPO PARA CUANDO ESTE EN PRODUCCION (REDUCIRLO)
+            "options": "-c statement_timeout=30000 -c lock_timeout=10000",
         },
     }
 }
@@ -103,6 +106,12 @@ DATABASES = {
 # ── Errores genéricos via DRF ──
 
 REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": [
+        "rest_framework.renderers.JSONRenderer",
+    ] if ENVIRONMENT == "production" else [
+        "rest_framework.renderers.JSONRenderer",
+        "rest_framework.renderers.BrowsableAPIRenderer",
+    ],
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "product.authentication.CookieJWTAuthentication",
     ),
