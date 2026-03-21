@@ -8,14 +8,12 @@ def tiene_rol(user, *roles):
 
 
 class DenegarPorDefecto(BasePermission):
-    
     message = "Acceso denegado"
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
             return False
         return request.user.groups.exists()
-
 
     def has_object_permission(self, request, view, obj):
         if not request.user or not request.user.is_authenticated:
@@ -39,7 +37,6 @@ class EsGerenteOAdmin(BasePermission):
     def has_permission(self, request, view):
         return tiene_rol(request.user, "Gerente", "Admin")
 
-
     def has_object_permission(self, request, view, obj):
         return tiene_rol(request.user, "Gerente", "Admin")
 
@@ -49,7 +46,6 @@ class EsEmpleadoOSuperior(BasePermission):
 
     def has_permission(self, request, view):
         return tiene_rol(request.user, "Empleado", "Gerente", "Admin")
-
 
     def has_object_permission(self, request, view, obj):
         return tiene_rol(request.user, "Empleado", "Gerente", "Admin")
@@ -61,7 +57,7 @@ class PermisoInventario(BasePermission):
     POST   → Gerente, Admin
     PUT    → Gerente, Admin
     PATCH  → Gerente, Admin
-    DELETE → Solo Admin
+    DELETE → Solo Admin activo
     """
     message = "No tienes permisos para esta acción"
 
@@ -79,11 +75,10 @@ class PermisoInventario(BasePermission):
             return tiene_rol(request.user, "Gerente", "Admin")
 
         if request.method == "DELETE":
-            return tiene_rol(request.user, "Admin")
+ 
+            return tiene_rol(request.user, "Admin") and request.user.is_active
 
-    
         return False
-
 
     def has_object_permission(self, request, view, obj):
         if not request.user or not request.user.is_authenticated:
@@ -99,6 +94,25 @@ class PermisoInventario(BasePermission):
             return tiene_rol(request.user, "Gerente", "Admin")
 
         if request.method == "DELETE":
-            return tiene_rol(request.user, "Admin")
+
+            return tiene_rol(request.user, "Admin") and request.user.is_active
 
         return False
+
+
+# operaciones bulk
+class PermisoBulk(BasePermission):
+    
+    message = "Las operaciones masivas requieren rol de Administrador"
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if not request.user.groups.exists():
+            return False
+
+        return tiene_rol(request.user, "Admin") and request.user.is_active
+
+    def has_object_permission(self, request, view, obj):
+        return tiene_rol(request.user, "Admin") and request.user.is_active
