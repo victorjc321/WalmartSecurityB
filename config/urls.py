@@ -1,9 +1,10 @@
 from django.contrib import admin
 from django.urls import path, include
-
+from product.api import mi_rol_view
 
 from product.api import (
     login_view,
+    mi_rol_view,
     verificar_totp_view,
     logout_view,
     RefreshView,
@@ -28,6 +29,7 @@ urlpatterns = [
     path("refresh/", RefreshView.as_view()),
     path("logout-all/", logout_all_view),
     path("api/check-session/", check_session),
+    path("api/mi-rol/", mi_rol_view),
     path(
         "api/docs/",
         SpectacularSwaggerView.as_view(url_name="schema"),

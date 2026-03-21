@@ -8,9 +8,6 @@ def tiene_rol(user, *roles):
     return user.groups.filter(name__in=roles).exists()
 
 
-# ─────────────────────────────────────────
-# Permiso base — deniega por defecto
-# ─────────────────────────────────────────
 
 class DenegarPorDefecto(BasePermission):
     """
@@ -26,9 +23,7 @@ class DenegarPorDefecto(BasePermission):
         return request.user.groups.exists()
 
 
-# ─────────────────────────────────────────
-# Roles específicos
-# ─────────────────────────────────────────
+
 
 class EsAdmin(BasePermission):
     """Acceso total — solo Admin"""
@@ -54,9 +49,6 @@ class EsEmpleadoOSuperior(BasePermission):
         return tiene_rol(request.user, "Empleado", "Gerente", "Admin")
 
 
-# ─────────────────────────────────────────
-# Permiso mixto para el ViewSet
-# ─────────────────────────────────────────
 
 class PermisoInventario(BasePermission):
     """
