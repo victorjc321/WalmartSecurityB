@@ -92,10 +92,13 @@ DATABASES = {
         "PASSWORD": os.getenv("DB_PASSWORD"),
         "HOST": os.getenv("DB_HOST"),
         "PORT": os.getenv("DB_PORT"),
+        "CONN_MAX_AGE": 60,
         "OPTIONS": {
             "sslmode": "verify-full",
             "sslrootcert": os.path.join(BASE_DIR, "global-bundle.pem"),
             "connect_timeout": 5,
+            # CAMBIAR EL TIEMPO PARA CUANDO ESTE EN PRODUCCION (REDUCIRLO)
+            "options": "-c statement_timeout=30000 -c lock_timeout=10000",
         },
     }
 }
@@ -103,6 +106,16 @@ DATABASES = {
 # ── Errores genéricos via DRF ──
 
 REST_FRAMEWORK = {
+    "DEFAULT_RENDERER_CLASSES": (
+        [
+            "rest_framework.renderers.JSONRenderer",
+        ]
+        if ENVIRONMENT == "production"
+        else [
+            "rest_framework.renderers.JSONRenderer",
+            "rest_framework.renderers.BrowsableAPIRenderer",
+        ]
+    ),
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "product.authentication.CookieJWTAuthentication",
     ),
@@ -150,7 +163,7 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
+# CAMBIAR UNOS PUNTOS A TRUE ANTES DE PRODUCCION
 SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
     "REFRESH_TOKEN_LIFETIME": timedelta(minutes=30),
@@ -179,10 +192,7 @@ MIDDLEWARE.insert(0, "product.middleware.SecurityMiddleware")
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
-
-
+TIME_ZONE = "America/Mexico_City"
 USE_I18N = True
 USE_TZ = True
 
@@ -196,20 +206,27 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 
 # evita que el navegador adivine el tipo de archivo
 SECURE_CONTENT_TYPE_NOSNIFF = True
-# evita que la app sea embebida en un iframe de otro sitio
 X_FRAME_OPTIONS = "DENY"
 SECURE_BROWSER_XSS_FILTER = True
+CONTENT_SECURITY_POLICY = "frame-ancestors 'none'"
+
 
 # default 'none', todo bloqueado menos lo que se especifica
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ("'none'",),
         "connect-src": ("'self'", "http://localhost:5173", "http://127.0.0.1:5173"),
-        "script-src": ("'self'",),
-        "style-src": ("'self'",),
-        "img-src": ("'self'", "data:"),
+        "script-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
+        "style-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
+        "img-src": ("'self'", "data:", "https://cdn.jsdelivr.net"),
         "font-src": ("'self'",),
         "frame-ancestors": ("'none'",),
+        "connect-src": (
+            "'self'",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "https://cdn.jsdelivr.net",
+        ),
     }
 }
 

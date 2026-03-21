@@ -3,6 +3,8 @@ import qrcode
 import io
 from datetime import timedelta
 import base64
+from .discord_logger import enviar_discord
+from django.utils.timezone import now
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -14,7 +16,7 @@ from django.contrib.auth.models import User
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth import logout as django_logout
-from .models import InventoryItem, UserTOTP
+from .models import InventoryItem, UserTOTP, FailedLoginAttempt
 from .serializers import InventoryItemSerializer
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.views import APIView
@@ -23,6 +25,7 @@ from django.utils.timezone import now
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
 from django.http import JsonResponse
+from .discord_logger import enviar_discord
 from django.contrib.auth.decorators import login_required
 from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
@@ -157,14 +160,7 @@ def logout_view(request):
     response = Response({"message": "Logout exitoso"})
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
-
     return response
-
-
-from rest_framework_simplejwt.token_blacklist.models import (
-    OutstandingToken,
-    BlacklistedToken,
-)
 
 
 @api_view(["POST"])
@@ -229,6 +225,10 @@ def verificar_totp_view(request):
         samesite="Lax",  # ⚠️Poner en None antes de subir
         max_age=60 * 60 * 24,
     )
+
+    # Notificacion del login a discord
+    mensaje = f"LOGIN\nUsuario: {user.username}"
+    enviar_discord(mensaje, 5763719)
 
     return response
 
