@@ -2,6 +2,7 @@ import pyotp
 import qrcode
 import io
 from datetime import timedelta
+from django.utils.dateparse import parse_datetime
 import base64
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
@@ -113,6 +114,11 @@ def login_view(request):
     attempt.blocked_until = None
     attempt.save()
 
+    request.session["pre_2fa_user"] = user.id
+    request.session.modified = True
+    request.session["otp_attempts"] = 0
+    request.session["otp_blocked_until"] = None
+
     totp_obj, created = UserTOTP.objects.get_or_create(
         user=user, defaults={"totp_secret": pyotp.random_base32()}
     )
@@ -148,6 +154,8 @@ def check_session(request):
 
 @api_view(["POST"])
 def logout_view(request):
+    user = request.user if request.user.is_authenticated else None
+
     refresh_token = request.COOKIES.get("refresh_token")
 
     if refresh_token:
@@ -157,10 +165,34 @@ def logout_view(request):
         except:
             pass
 
+    # 🔔 NOTIFICACIÓN DISCORD
+    if user:
+        mensaje = f"LOGOUT\nUsuario: {user.username}"
+    else:
+        mensaje = "LOGOUT\nUsuario desconocido (token expirado)"
+
+    enviar_discord(mensaje, 16711680)
+
     response = Response({"message": "Logout exitoso"})
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
+
     return response
+
+
+@api_view(["POST"])
+def session_expired_view(request):
+    ip = request.META.get("REMOTE_ADDR")
+
+    mensaje = f"""⚠️ SESIÓN EXPIRADA
+
+IP: {ip}
+Evento: Token expirado o inválido
+"""
+
+    enviar_discord(mensaje, 16776960)
+
+    return Response({"message": "Evento registrado"})
 
 
 @api_view(["POST"])
@@ -183,51 +215,91 @@ def logout_all_view(request):
 
 @api_view(["POST"])
 def verificar_totp_view(request):
-    username = request.data.get("username")
-    codigo = request.data.get("codigo")
+    user_id = request.session.get("pre_2fa_user")
+
+    if not user_id:
+        return Response({"error": "Sesión inválida"}, status=403)
 
     try:
-        user = User.objects.get(username=username)
+        user = User.objects.get(id=user_id)
         totp_obj = UserTOTP.objects.get(user=user)
     except:
         return Response({"error": "Usuario no encontrado"}, status=400)
 
+    # 🔥 CONTROL DE INTENTOS OTP
+    attempts = request.session.get("otp_attempts", 0)
+    blocked_until = request.session.get("otp_blocked_until")
+
+    if blocked_until:
+        blocked_until = parse_datetime(blocked_until)
+
+    if blocked_until and now() < blocked_until:
+        return Response(
+            {
+                "error": "Demasiados intentos OTP",
+                "blocked_until": blocked_until,
+            },
+            status=403,
+        )
+
+    codigo = request.data.get("codigo")
+
     totp = pyotp.TOTP(totp_obj.totp_secret)
+
     if not totp.verify(codigo):
-        return Response({"error": "Código incorrecto o expirado"}, status=400)
+        attempts += 1
+        request.session["otp_attempts"] = attempts
+
+        if attempts == 5:
+            request.session["otp_blocked_until"] = (
+                now() + timedelta(minutes=5)
+            ).isoformat()
+
+        elif attempts == 10:
+            request.session["otp_blocked_until"] = (
+                now() + timedelta(minutes=15)
+            ).isoformat()
+
+        request.session.modified = True
+
+        return Response(
+            {"error": "Código incorrecto", "intentos": attempts}, status=400
+        )
+
+    request.session.pop("pre_2fa_user", None)
+    request.session.pop("otp_attempts", None)
+    request.session.pop("otp_blocked_until", None)
 
     if not totp_obj.is_configured:
         totp_obj.is_configured = True
         totp_obj.save()
 
+    # 🔐 GENERAR TOKENS
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
 
     response = Response({"message": "Login exitoso"})
 
-    # 🍪 Access token
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # ⚠️ en local pon False
-        samesite="Lax",  # ⚠️Poner en None antes de subir
+        secure=False,
+        samesite="Lax",
         max_age=60 * 10,
     )
 
-    # 🍪 Refresh token
     response.set_cookie(
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,  # ⚠️ en local pon False
-        samesite="Lax",  # ⚠️Poner en None antes de subir
+        secure=False,
+        samesite="Lax",
         max_age=60 * 60 * 24,
     )
 
-    # Notificacion del login a discord
-    mensaje = f"LOGIN\nUsuario: {user.username}"
+    mensaje = f"LOGIN 2FA\nUsuario: {user.username}"
     enviar_discord(mensaje, 5763719)
 
     return response
@@ -280,7 +352,7 @@ class RefreshView(APIView):
             return response
 
         except TokenError:
-            print("⚠️ POSIBLE ROBO DE TOKEN DETECTADO")
+            print("POSIBLE ROBO DE TOKEN DETECTADO")
 
             response = Response({"error": "Sesión comprometida"}, status=401)
 

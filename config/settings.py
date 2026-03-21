@@ -165,7 +165,7 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # CAMBIAR UNOS PUNTOS A TRUE ANTES DE PRODUCCION
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=10),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
     "REFRESH_TOKEN_LIFETIME": timedelta(minutes=30),
     "AUTH_HEADER_TYPES": ("Bearer",),
     "SIGNING_KEY": SECRET_KEY,
@@ -179,10 +179,10 @@ SIMPLE_JWT = {
 }
 
 # Cookies seguras
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
-
+SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "https://tudominio.com"]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -246,8 +246,8 @@ if ENVIRONMENT == "production":
     SECURE_HSTS_PRELOAD = True
 
     # cookies solo viajan por HTTPS, nunca por HTTP plano
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
 
     # Igual se define en el .env cuando ya este en produccion (ruta del vue)
     FRONTEND_URL = os.getenv("FRONTEND_URL", "")
