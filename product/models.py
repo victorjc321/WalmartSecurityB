@@ -59,7 +59,6 @@ class FailedLoginAttempt(models.Model):
     def is_currently_blocked(self):
         if self.is_blocked and self.blocked_until:
             if now() >= self.blocked_until:
-                # 🔄 desbloqueo automático
                 self.is_blocked = False
                 self.attempts = 0
                 self.blocked_until = None
@@ -69,11 +68,11 @@ class FailedLoginAttempt(models.Model):
         return False
 
     def apply_block(self):
-        if self.attempts >= 15:
+        if self.attempts == 15:
             self.blocked_until = now() + timedelta(hours=1)
-        elif self.attempts >= 10:
+        elif self.attempts == 10:
             self.blocked_until = now() + timedelta(minutes=30)
-        elif self.attempts >= 5:
+        elif self.attempts == 5:
             self.blocked_until = now() + timedelta(minutes=10)
 
         self.is_blocked = True

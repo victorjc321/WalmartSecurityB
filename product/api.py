@@ -1,10 +1,10 @@
 import pyotp
 import qrcode
 import io
+from datetime import timedelta
 import base64
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
-from datetime import timedelta
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
@@ -25,10 +25,14 @@ from django.views.decorators.debug import sensitive_variables, sensitive_post_pa
 from django.utils.timezone import now
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
+from django.http import JsonResponse
+from .discord_logger import enviar_discord
+from django.contrib.auth.decorators import login_required
 from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
     BlacklistedToken,
 )
+
 
 def registrar_log(user, accion, objeto):
     """Registra una acción en el log de Django Admin"""
@@ -61,6 +65,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
             registrar_log(self.request.user, DELETION, instance)
         instance.delete()
 
+
 @api_view(["POST"])
 @sensitive_variables('password')
 def login_view(request):
@@ -69,40 +74,42 @@ def login_view(request):
 
     ip = request.META.get("REMOTE_ADDR")
 
-    attempt, created = FailedLoginAttempt.objects.get_or_create(ip=ip)
+    attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip)
+
+    if attempt.is_currently_blocked():
+        return Response(
+            {"error": "IP bloqueada", "blocked_until": attempt.blocked_until},
+            status=403,
+        )
 
     user = authenticate(username=username, password=password)
-    #---------------------------------------------------------------
-    # NOTA: INTERCAMBIAR EL ORDEN DEL IF Y USER EN PRODUCCION
-    #---------------------------------------------------------------
-    if attempt.is_currently_blocked() and not user:
-        return Response(
-            {"error": f"IP bloqueada hasta {attempt.blocked_until}"}, status=403
-        )
 
     if not user:
         attempt.attempts += 1
-        attempt.last_attempt = now()
 
-        max_attempts = 5
-        remaining = max_attempts - attempt.attempts
+        # 🔥 BLOQUEOS PROGRESIVOS
+        if attempt.attempts == 5:
+            attempt.blocked_until = now() + timedelta(minutes=10)
+            attempt.is_blocked = True
 
-        if attempt.attempts >= 5:
-            attempt.apply_block()
-            attempt.save()
+        elif attempt.attempts == 10:
+            attempt.blocked_until = now() + timedelta(minutes=30)
+            attempt.is_blocked = True
 
-            return Response(
-                {"error": "IP bloqueada", "blocked_until": attempt.blocked_until},
-                status=403,
-            )
+        elif attempt.attempts == 15:
+            attempt.blocked_until = now() + timedelta(hours=1)
+            attempt.is_blocked = True
 
         attempt.save()
+
+        remaining = max(0, 5 - attempt.attempts)
 
         return Response(
             {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
             status=400,
         )
 
+    # LOGIN CORRECTO → RESET
     attempt.attempts = 0
     attempt.is_blocked = False
     attempt.blocked_until = None
@@ -135,6 +142,12 @@ def login_view(request):
     )
 
 
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def check_session(request):
+    return Response({"authenticated": True})
+
+
 @api_view(["POST"])
 def logout_view(request):
     refresh_token = request.COOKIES.get("refresh_token")
@@ -150,6 +163,7 @@ def logout_view(request):
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
     return response
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -200,8 +214,8 @@ def verificar_totp_view(request):
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # ⚠️ en local pon False
-        samesite="Lax",  # ⚠️Poner en None antes de subir
+        secure=False,  # en local pon False
+        samesite="Lax",  # Poner en None antes de subir
         max_age=60 * 10,
     )
 
@@ -210,8 +224,8 @@ def verificar_totp_view(request):
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,  # ⚠️ en local pon False
-        samesite="Lax",  # ⚠️Poner en None antes de subir
+        secure=False,  # en local pon False
+        samesite="Lax",  # Poner en None antes de subir
         max_age=60 * 60 * 24,
     )
 
@@ -222,8 +236,8 @@ def verificar_totp_view(request):
     return response
 
 
-@api_view(["GET"])
 @ensure_csrf_cookie
+@api_view(["GET"])
 def csrf_view(request):
     return Response({"message": "CSRF cookie set"})
 
