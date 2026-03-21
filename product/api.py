@@ -43,7 +43,8 @@ def registrar_log(user, accion, objeto):
 class InventoryItemViewSet(viewsets.ModelViewSet):
     queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.AllowAny] # Cambiar a IsAuthenticated despues de que se arregle el token refresh
+    http_method_names = ['get', 'post', 'patch', 'delete', 'head', 'options']
 
     def perform_create(self, serializer):
         obj = serializer.save()
