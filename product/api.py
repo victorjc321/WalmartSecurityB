@@ -59,25 +59,49 @@ def registrar_log(user, accion, objeto):
 # ─────────────────────────────────────────
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
-    queryset = InventoryItem.objects.all()
     serializer_class = InventoryItemSerializer
     throttle_classes = [IPRateThrottle, UserRateThrottle]
     permission_classes = [PermisoInventario]
+
+    def get_queryset(self):
+        user = self.request.user
+
+
+        if not user or not user.is_authenticated:
+            return InventoryItem.objects.none()
+
+        if not user.groups.exists():
+            return InventoryItem.objects.none()
+
+        return InventoryItem.objects.all()
+
+    def retrieve(self, request, *args, **kwargs):
+        instance = self.get_object()  
+        serializer = self.get_serializer(instance)
+        return Response(serializer.data)
+
+ 
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()  
+        partial = kwargs.pop('partial', False)
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+        if request.user.is_authenticated:
+            registrar_log(request.user, CHANGE, obj)
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()  
+        if request.user.is_authenticated:
+            registrar_log(request.user, DELETION, instance)
+        instance.delete()
+        return Response(status=204)
 
     def perform_create(self, serializer):
         obj = serializer.save()
         if self.request.user.is_authenticated:
             registrar_log(self.request.user, ADDITION, obj)
-
-    def perform_update(self, serializer):
-        obj = serializer.save()
-        if self.request.user.is_authenticated:
-            registrar_log(self.request.user, CHANGE, obj)
-
-    def perform_destroy(self, instance):
-        if self.request.user.is_authenticated:
-            registrar_log(self.request.user, DELETION, instance)
-        instance.delete()
 
 
 # ─────────────────────────────────────────
