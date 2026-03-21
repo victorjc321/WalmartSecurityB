@@ -128,42 +128,57 @@ def login_view(request):
     ip = request.META.get("REMOTE_ADDR")
     attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip)
 
-    # ── Verifica bloqueo ANTES de autenticar ──
+    # 🔒 Verificar bloqueo antes
     if attempt.is_currently_blocked():
         return Response(
-            {"error": "Acceso temporalmente restringido"},
+            {
+                "error": "Acceso temporalmente restringido",
+                "blocked_until": attempt.blocked_until,
+            },
             status=403,
         )
 
     user = authenticate(username=username, password=password)
 
+    # ❌ LOGIN FALLIDO
     if not user:
         attempt.attempts += 1
 
-        if attempt.attempts >= 3:
-            attempt.apply_block()
-            attempt.save()
-            return Response(
-                {"error": "Acceso temporalmente restringido"},
-                status=403,
-            )
+        # 🔥 BLOQUEOS PROGRESIVOS
+        if attempt.attempts == 5:
+            attempt.blocked_until = now() + timedelta(minutes=10)
+            attempt.is_blocked = True
+
+        elif attempt.attempts == 10:
+            attempt.blocked_until = now() + timedelta(minutes=30)
+            attempt.is_blocked = True
+
+        elif attempt.attempts == 15:
+            attempt.blocked_until = now() + timedelta(hours=1)
+            attempt.is_blocked = True
 
         attempt.save()
+
+        remaining = max(0, 5 - attempt.attempts)
+
         return Response(
-            {"error": "Credenciales incorrectas"},
+            {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
             status=400,
         )
 
+    # ✅ LOGIN CORRECTO → RESET
     attempt.attempts = 0
     attempt.is_blocked = False
     attempt.blocked_until = None
     attempt.save()
 
+    # 🧠 SESIÓN PRE-2FA
     request.session["pre_2fa_user"] = user.id
-    request.session.modified = True
     request.session["otp_attempts"] = 0
     request.session["otp_blocked_until"] = None
+    request.session.modified = True
 
+    # 🔐 TOTP
     totp_obj, created = UserTOTP.objects.get_or_create(
         user=user, defaults={"totp_secret": pyotp.random_base32()}
     )
