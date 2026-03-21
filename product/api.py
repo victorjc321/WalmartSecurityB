@@ -21,6 +21,7 @@ from .serializers import InventoryItemSerializer
 from django.views.decorators.csrf import ensure_csrf_cookie
 from rest_framework.views import APIView
 from .models import FailedLoginAttempt
+from django.views.decorators.debug import sensitive_variables, sensitive_post_parameters
 from django.utils.timezone import now
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
@@ -61,6 +62,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         instance.delete()
 
 @api_view(["POST"])
+@sensitive_variables('password')
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
@@ -168,6 +170,7 @@ def logout_all_view(request):
 
 
 @api_view(["POST"])
+@sensitive_variables('codigo', 'totp_secret')
 def verificar_totp_view(request):
     username = request.data.get("username")
     codigo = request.data.get("codigo")
@@ -226,6 +229,7 @@ def csrf_view(request):
 
 
 class RefreshView(APIView):
+    @sensitive_variables('refresh_token', 'access_token', 'new_refresh')
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
 
