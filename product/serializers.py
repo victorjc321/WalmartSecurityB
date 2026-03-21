@@ -82,29 +82,30 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         read_only_fields = ('item_id', 'created_at', 'updated_at')
 
     def validate_product_name(self, value):
-        # sanitiza + evita duplicados
         value = sanitize_text(value)
-
         query = InventoryItem.objects.filter(product_name__iexact=value)
-
         if self.instance:
             query = query.exclude(pk=self.instance.pk)
-
         if query.exists():
             raise serializers.ValidationError("Este producto ya existe.")
-
         return value
 
     def validate(self, attrs):
-        # bloquea campos extra enviados manualmente
+        # bloquea campos extra
         extra = set(self.initial_data.keys()) - set(self.fields.keys())
         if extra:
             raise serializers.ValidationError("Campos no permitidos.")
 
+        # bloquea intentos de escribir campos read_only en PATCH
+        read_only_attempted = set(self.initial_data.keys()) & set(self.Meta.read_only_fields)
+        if read_only_attempted:
+            raise serializers.ValidationError(
+                f"Campos no modificables: {read_only_attempted}"
+            )
+
         # valida relación precio-stock
         price = attrs.get("unit_price")
         stock = attrs.get("quantity_in_stock")
-
         if price is not None and stock is not None:
             if price == 0 and stock > 0:
                 raise serializers.ValidationError(
@@ -112,7 +113,6 @@ class InventoryItemSerializer(serializers.ModelSerializer):
                 )
 
         return attrs
-
 
 class LoginSerializer(serializers.Serializer):
 
