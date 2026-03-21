@@ -1,10 +1,11 @@
 import pyotp
 import qrcode
 import io
+from datetime import timedelta
+from django.utils.dateparse import parse_datetime
 import base64
 from datetime import timedelta
-from .permissions import PermisoInventario, PermisoBulk 
-from .permissions import PermisoInventario
+from .permissions import PermisoInventario, PermisoBulk
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
 from django.utils import timezone
@@ -22,29 +23,35 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.debug import sensitive_variables, sensitive_post_parameters
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
-from .throttles import IPRateThrottle, LoginRateThrottle
-from .throttles import IPRateThrottle, LoginRateThrottle
+from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from rest_framework.throttling import UserRateThrottle
 from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt
 from .serializers import InventoryItemSerializer
-from rest_framework_simplejwt.token_blacklist.models import OutstandingToken, BlacklistedToken
+from rest_framework_simplejwt.token_blacklist.models import (
+    OutstandingToken,
+    BlacklistedToken,
+)
 
 
 # ─────────────────────────────────────────
 # Log del admin
 # ─────────────────────────────────────────
-    
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def mi_rol_view(request):
     grupos = list(request.user.groups.values_list("name", flat=True))
-    return Response({
-        "username": request.user.username,
-        "roles": grupos,
-        "is_admin": "Admin" in grupos,
-        "is_gerente": "Gerente" in grupos,
-        "is_empleado": "Empleado" in grupos,
-    })
+    return Response(
+        {
+            "username": request.user.username,
+            "roles": grupos,
+            "is_admin": "Admin" in grupos,
+            "is_gerente": "Gerente" in grupos,
+            "is_empleado": "Empleado" in grupos,
+        }
+    )
+
 
 def registrar_log(user, accion, objeto):
     LogEntry.objects.create(
@@ -53,11 +60,14 @@ def registrar_log(user, accion, objeto):
         object_id=str(objeto.pk),
         object_repr=str(objeto)[:200],
         action_flag=accion,
-        change_message=""
+        change_message="",
     )
+
+
 # ─────────────────────────────────────────
 # CRUD de inventario
 # ─────────────────────────────────────────
+
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
     serializer_class = InventoryItemSerializer
@@ -66,7 +76,6 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-
 
         if not user or not user.is_authenticated:
             return InventoryItem.objects.none()
@@ -77,14 +86,13 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         return InventoryItem.objects.all()
 
     def retrieve(self, request, *args, **kwargs):
-        instance = self.get_object()  
+        instance = self.get_object()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
- 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()  
-        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        partial = kwargs.pop("partial", False)
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         obj = serializer.save()
@@ -93,7 +101,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()  
+        instance = self.get_object()
         if request.user.is_authenticated:
             registrar_log(request.user, DELETION, instance)
         instance.delete()
@@ -109,9 +117,10 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 # Login
 # ─────────────────────────────────────────
 
+
 @api_view(["POST"])
-@throttle_classes([LoginRateThrottle])
-@sensitive_variables('password')
+@throttle_classes([IPRateThrottle, LoginRateThrottle])
+@sensitive_variables("password")
 def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
@@ -145,11 +154,15 @@ def login_view(request):
             status=400,
         )
 
-    # ── Login correcto — resetea intentos ──
     attempt.attempts = 0
     attempt.is_blocked = False
     attempt.blocked_until = None
     attempt.save()
+
+    request.session["pre_2fa_user"] = user.id
+    request.session.modified = True
+    request.session["otp_attempts"] = 0
+    request.session["otp_blocked_until"] = None
 
     totp_obj, created = UserTOTP.objects.get_or_create(
         user=user, defaults={"totp_secret": pyotp.random_base32()}
@@ -164,24 +177,25 @@ def login_view(request):
         img.save(buffer, format="PNG")
         qr_base64 = base64.b64encode(buffer.getvalue()).decode()
 
-        return Response({
-            "step": "setup",
-            "qr": qr_base64,
-            "mensaje": "Escanea el QR con una Authenticator",
-        })
+        return Response(
+            {
+                "step": "setup",
+                "qr": qr_base64,
+                "mensaje": "Escanea el QR con una Authenticator",
+            }
+        )
 
-    return Response({
-        "step": "verify",
-        "mensaje": "Ingresa el código de autenticación"
-    })
+    return Response({"step": "verify", "mensaje": "Ingresa el código de autenticación"})
 
 
 # ─────────────────────────────────────────
 # Verificar sesión
 # ─────────────────────────────────────────
 
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
+@throttle_classes([AuthSessionThrottle])
 def check_session(request):
     return Response({"authenticated": True})
 
@@ -190,8 +204,12 @@ def check_session(request):
 # Logout
 # ─────────────────────────────────────────
 
+
 @api_view(["POST"])
+@throttle_classes([AuthSessionThrottle])
 def logout_view(request):
+    user = request.user if request.user.is_authenticated else None
+
     refresh_token = request.COOKIES.get("refresh_token")
 
     if refresh_token:
@@ -201,10 +219,34 @@ def logout_view(request):
         except:
             pass
 
+    # 🔔 NOTIFICACIÓN DISCORD
+    if user:
+        mensaje = f"LOGOUT\nUsuario: {user.username}"
+    else:
+        mensaje = "LOGOUT\nUsuario desconocido (token expirado)"
+
+    enviar_discord(mensaje, 16711680)
+
     response = Response({"message": "Logout exitoso"})
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
+
     return response
+
+
+@api_view(["POST"])
+def session_expired_view(request):
+    ip = request.META.get("REMOTE_ADDR")
+
+    mensaje = f"""⚠️ SESIÓN EXPIRADA
+
+IP: {ip}
+Evento: Token expirado o inválido
+"""
+
+    enviar_discord(mensaje, 16776960)
+
+    return Response({"message": "Evento registrado"})
 
 
 @api_view(["POST"])
@@ -226,20 +268,21 @@ def logout_all_view(request):
 # Verificar TOTP
 # ─────────────────────────────────────────
 
+
 @api_view(["POST"])
-@throttle_classes([LoginRateThrottle])
-@sensitive_variables('codigo')
+@throttle_classes([IPRateThrottle, LoginRateThrottle])
+@sensitive_variables("codigo")
 def verificar_totp_view(request):
-    username = request.data.get("username")
-    codigo = request.data.get("codigo")
+    user_id = request.session.get("pre_2fa_user")
+
+    if not user_id:
+        return Response({"error": "Sesión inválida"}, status=403)
 
     try:
-        user = User.objects.get(username=username)
+        user = User.objects.get(id=user_id)
         totp_obj = UserTOTP.objects.get(user=user)
     except:
-        return Response(
-            {"error": "Acceso temporalmente restringido"}, status=400
-        )
+        return Response({"error": "Acceso temporalmente restringido"}, status=400)
 
     totp_attempt, created = FailedTOTPAttempt.objects.get_or_create(user=user)
 
@@ -250,43 +293,55 @@ def verificar_totp_view(request):
             status=403,
         )
 
-    totp = pyotp.TOTP(totp_obj.totp_secret)
-    if not totp.verify(codigo):
-        totp_attempt.attempts += 1
+    # 🔥 CONTROL DE INTENTOS OTP
+    attempts = request.session.get("otp_attempts", 0)
+    blocked_until = request.session.get("otp_blocked_until")
 
-        if totp_attempt.attempts >= 3:
-            totp_attempt.apply_block()
-            totp_attempt.save()
-            return Response(
-                {"error": "Acceso temporalmente restringido"},
-                status=403,
-            )
+    if blocked_until:
+        blocked_until = parse_datetime(blocked_until)
 
-        totp_attempt.save()
+    if blocked_until and now() < blocked_until:
         return Response(
-            {"error": "Código incorrecto o expirado"},
-            status=400,
-        )
-
-    # ── Recarga desde BD para verificar si quedó bloqueado ──
-    totp_attempt.refresh_from_db()
-
-    if totp_attempt.is_currently_blocked():
-        return Response(
-            {"error": "Acceso temporalmente restringido"},
+            {
+                "error": "Demasiados intentos OTP",
+                "blocked_until": blocked_until,
+            },
             status=403,
         )
 
-   
-    totp_attempt.attempts = 0
-    totp_attempt.is_blocked = False
-    totp_attempt.blocked_until = None
-    totp_attempt.save()
+    codigo = request.data.get("codigo")
+
+    totp = pyotp.TOTP(totp_obj.totp_secret)
+
+    if not totp.verify(codigo):
+        attempts += 1
+        request.session["otp_attempts"] = attempts
+
+        if attempts == 5:
+            request.session["otp_blocked_until"] = (
+                now() + timedelta(minutes=5)
+            ).isoformat()
+
+        elif attempts == 10:
+            request.session["otp_blocked_until"] = (
+                now() + timedelta(minutes=15)
+            ).isoformat()
+
+        request.session.modified = True
+
+        return Response(
+            {"error": "Código incorrecto", "intentos": attempts}, status=400
+        )
+
+    request.session.pop("pre_2fa_user", None)
+    request.session.pop("otp_attempts", None)
+    request.session.pop("otp_blocked_until", None)
 
     if not totp_obj.is_configured:
         totp_obj.is_configured = True
         totp_obj.save()
 
+    # 🔐 GENERAR TOKENS
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
@@ -311,7 +366,7 @@ def verificar_totp_view(request):
         max_age=60 * 60 * 24,
     )
 
-    mensaje = f"LOGIN\nUsuario: {user.username}"
+    mensaje = f"LOGIN 2FA\nUsuario: {user.username}"
     enviar_discord(mensaje, 5763719)
 
     return response
@@ -321,6 +376,7 @@ def verificar_totp_view(request):
 # CSRF y Refresh
 # ─────────────────────────────────────────
 
+
 @api_view(["GET"])
 @ensure_csrf_cookie
 def csrf_view(request):
@@ -328,7 +384,7 @@ def csrf_view(request):
 
 
 class RefreshView(APIView):
-    @sensitive_variables('refresh_token', 'access_token', 'new_refresh')
+    @sensitive_variables("refresh_token", "access_token", "new_refresh")
     def post(self, request):
         refresh_token = request.COOKIES.get("refresh_token")
 
@@ -367,52 +423,38 @@ class RefreshView(APIView):
             return response
 
         except TokenError:
-            print("⚠️POSIBLE ROBO DE TOKEN DETECTADO")
+            print("POSIBLE ROBO DE TOKEN DETECTADO")
+
             response = Response({"error": "Sesión comprometida"}, status=401)
             response.delete_cookie("access_token")
             response.delete_cookie("refresh_token")
             return response
-        
+
+
 # ─────────────────────────────────────────
 # Bulk Delete — Solo Admin
 # ─────────────────────────────────────────
 
+
 class BulkDeleteView(APIView):
-    """
-    DELETE /inventory/bulk/
-    Elimina múltiples productos por ID.
-    Solo Admin activo puede ejecutarlo.
-    """
+
     permission_classes = [PermisoBulk]
     throttle_classes = [IPRateThrottle, UserRateThrottle]
 
     def delete(self, request):
         ids = request.data.get("ids", [])
 
-
         if not ids or not isinstance(ids, list):
-            return Response(
-                {"error": "Se requiere una lista de IDs"},
-                status=400
-            )
+            return Response({"error": "Se requiere una lista de IDs"}, status=400)
 
-   
         if len(ids) > 20:
-            return Response(
-                {"error": "Máximo 20 productos por operación"},
-                status=400
-            )
-
+            return Response({"error": "Máximo 20 productos por operación"}, status=400)
 
         items = InventoryItem.objects.filter(item_id__in=ids)
 
         if not items.exists():
-            return Response(
-                {"error": "Ningún producto encontrado"},
-                status=404
-            )
+            return Response({"error": "Ningún producto encontrado"}, status=404)
 
- 
         for item in items:
             registrar_log(request.user, DELETION, item)
 
@@ -422,7 +464,4 @@ class BulkDeleteView(APIView):
         mensaje = f"BULK DELETE\nAdmin: {request.user.username}\nEliminados: {count} productos"
         enviar_discord(mensaje, 15158332)
 
-        return Response(
-            {"message": f"{count} productos eliminados"},
-            status=200
-        )
+        return Response({"message": f"{count} productos eliminados"}, status=200)
