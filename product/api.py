@@ -27,6 +27,9 @@ from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from rest_framework.throttling import UserRateThrottle
 from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt
 from .serializers import InventoryItemSerializer
+from .utils.critical_required import requiere_token_critico
+from .utils.critical_token import generar_critical_token
+import pyotp
 from .turnstile import verificar_turnstile
 from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
@@ -102,9 +105,15 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
+
+        if not requiere_token_critico(request):
+            return Response({"error": "Requiere verificación crítica"}, status=403)
+
         instance = self.get_object()
+
         if request.user.is_authenticated:
             registrar_log(request.user, DELETION, instance)
+
         instance.delete()
         return Response(status=204)
 
@@ -125,7 +134,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 def login_view(request):
     turnstile_token = request.data.get("cf_turnstile_response")
     ip = request.META.get("REMOTE_ADDR")
-    
+
     if not turnstile_token:
         return Response({"error": "Verificación requerida"}, status=400)
 
@@ -272,6 +281,28 @@ Evento: Token expirado o inválido
     enviar_discord(mensaje, 16776960)
 
     return Response({"message": "Evento registrado"})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def verify_critical_view(request):
+    codigo = request.data.get("codigo")
+
+    user = request.user
+
+    try:
+        totp_obj = UserTOTP.objects.get(user=user)
+    except:
+        return Response({"error": "TOTP no configurado"}, status=400)
+
+    totp = pyotp.TOTP(totp_obj.totp_secret)
+
+    if not totp.verify(codigo):
+        return Response({"error": "Código inválido"}, status=400)
+
+    token = generar_critical_token(user, request.session.session_key)
+
+    return Response({"critical_token": token})
 
 
 @api_view(["POST"])
@@ -467,6 +498,10 @@ class BulkDeleteView(APIView):
     throttle_classes = [IPRateThrottle, UserRateThrottle]
 
     def delete(self, request):
+
+        if not requiere_token_critico(request):
+            return Response({"error": "Requiere verificación crítica"}, status=403)
+
         ids = request.data.get("ids", [])
 
         if not ids or not isinstance(ids, list):

@@ -1,5 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
+from product.api import mi_rol_view
+from django.http import JsonResponse
 from product.api import (
     login_view,
     mi_rol_view,
@@ -9,21 +11,15 @@ from product.api import (
     csrf_view,
     logout_all_view,
     check_session,
+    verify_critical_view,
 )
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
 )
 
-from django.http import JsonResponse
-
-
-def home(request):
-    return JsonResponse({"mensaje": "API funcionando"})
-
 
 urlpatterns = [
-    path("", home),
     path("admin/", admin.site.urls),
     path("", include("product.urls")),
     path("api/login/", login_view),
@@ -35,6 +31,7 @@ urlpatterns = [
     path("logout-all/", logout_all_view),
     path("api/check-session/", check_session),
     path("api/mi-rol/", mi_rol_view),
+    path("api/verify-critical/", verify_critical_view),
     path(
         "api/docs/",
         SpectacularSwaggerView.as_view(url_name="schema"),
