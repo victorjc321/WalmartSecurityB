@@ -27,6 +27,7 @@ from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from rest_framework.throttling import UserRateThrottle
 from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt
 from .serializers import InventoryItemSerializer
+from .turnstile import verificar_turnstile
 from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
     BlacklistedToken,
@@ -122,6 +123,15 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 @throttle_classes([IPRateThrottle, LoginRateThrottle])
 @sensitive_variables("password")
 def login_view(request):
+    turnstile_token = request.data.get("cf_turnstile_response")
+    ip = request.META.get("REMOTE_ADDR")
+    
+    if not turnstile_token:
+        return Response({"error": "Verificación requerida"}, status=400)
+
+    if not verificar_turnstile(turnstile_token, ip):
+        return Response({"error": "Verificación fallida"}, status=400)
+
     username = request.data.get("username")
     password = request.data.get("password")
 
