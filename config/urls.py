@@ -17,8 +17,15 @@ from drf_spectacular.views import (
     SpectacularSwaggerView,
 )
 
+from django.http import JsonResponse
+
+
+def home(request):
+    return JsonResponse({"mensaje": "API funcionando"})
+
 
 urlpatterns = [
+    path("", home),
     path("admin/", admin.site.urls),
     path("", include("product.urls")),
     path("api/login/", login_view),
