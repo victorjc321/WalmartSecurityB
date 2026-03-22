@@ -28,7 +28,7 @@ class InventoryItem(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.product_name} (ID: {self.item_id})"
+        return self.product_name
 
     class Meta:
         db_table = "inventory_asset"
