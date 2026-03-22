@@ -219,17 +219,18 @@ CONTENT_SECURITY_POLICY = "frame-ancestors 'none'"
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ("'none'",),
-        "connect-src": ("'self'", "http://localhost:5173", "http://127.0.0.1:5173"),
-        "script-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
+        "script-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com"),
         "style-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
         "img-src": ("'self'", "data:", "https://cdn.jsdelivr.net"),
         "font-src": ("'self'",),
+        "frame-src": ("'self'", "https://challenges.cloudflare.com", "https://*.cloudflare.com"),
         "frame-ancestors": ("'none'",),
         "connect-src": (
             "'self'",
             "http://localhost:5173",
             "http://127.0.0.1:5173",
             "https://cdn.jsdelivr.net",
+            "https://challenges.cloudflare.com",
         ),
     }
 }

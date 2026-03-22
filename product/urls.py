@@ -17,6 +17,6 @@ inventory_detail = InventoryItemViewSet.as_view({
 
 urlpatterns = [
     path('inventory/', inventory_list, name='inventory-list'),
-    path('inventory/<uuid:pk>/', inventory_detail, name='inventory-detail'),
     path('inventory/bulk/', BulkDeleteView.as_view(), name='inventory-bulk-delete'),
+    path('inventory/<uuid:pk>/', inventory_detail, name='inventory-detail'),
 ]
