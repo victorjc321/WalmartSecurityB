@@ -1,7 +1,5 @@
 from django.contrib import admin
 from django.urls import path, include
-from product.api import mi_rol_view
-
 from product.api import (
     login_view,
     mi_rol_view,
