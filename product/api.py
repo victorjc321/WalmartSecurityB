@@ -30,6 +30,7 @@ from .serializers import InventoryItemSerializer
 from .utils.critical_required import requiere_token_critico
 from .utils.critical_token import generar_critical_token
 import pyotp
+from django.conf import settings
 from .turnstile import verificar_turnstile
 from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
@@ -408,7 +409,7 @@ def verificar_totp_view(request):
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="Lax",
         max_age=60 * 10,
     )
@@ -417,7 +418,7 @@ def verificar_totp_view(request):
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="Lax",
         max_age=60 * 60 * 24,
     )
@@ -461,7 +462,7 @@ class RefreshView(APIView):
                 key="access_token",
                 value=access_token,
                 httponly=True,
-                secure=False,
+                secure=settings.ENVIRONMENT == "production",
                 samesite="Lax",
                 max_age=60 * 10,
             )
@@ -471,7 +472,7 @@ class RefreshView(APIView):
                     key="refresh_token",
                     value=new_refresh,
                     httponly=True,
-                    secure=False,
+                    secure=settings.ENVIRONMENT == "production",
                     samesite="Lax",
                     max_age=60 * 60 * 24,
                 )

@@ -7,7 +7,6 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 SECRET_KEY = os.getenv("SECRET_KEY")
 
 # detecta el entorno para separar local vs producción
@@ -94,11 +93,10 @@ DATABASES = {
         "PORT": os.getenv("DB_PORT"),
         "CONN_MAX_AGE": 60,
         "OPTIONS": {
-            "sslmode": "verify-full",
+            "sslmode": "require",
             "sslrootcert": os.path.join(BASE_DIR, "global-bundle.pem"),
             "connect_timeout": 5,
-            # CAMBIAR EL TIEMPO PARA CUANDO ESTE EN PRODUCCION (REDUCIRLO)
-            "options": "-c statement_timeout=30000 -c lock_timeout=10000",
+            "options": f"-c statement_timeout={os.getenv('DB_STATEMENT_TIMEOUT', '30000')} " f"-c lock_timeout={os.getenv('DB_LOCK_TIMEOUT', '10000')}",
         },
     }
 }
@@ -127,11 +125,11 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "2/minute",
-        "user": "10/minute",
-         'ip': '60/minute',       
-         'login': '3/minute',
-         'auth_session': '10/minute',
+        "anon": "1/hour",
+        "user": "3/hour",
+         'ip': '10/hour',       
+         'login': '3/hour',
+         'auth_session': '3/hour',
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -145,11 +143,8 @@ SPECTACULAR_SETTINGS = {
     "SERVE_INCLUDE_SCHEMA": False,
 }
 
-# ── Límite de tamaño ──
-DATA_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024  # 1 MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
-FILE_UPLOAD_MAX_MEMORY_SIZE = 1 * 1024 * 1024
-
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -167,15 +162,14 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-# CAMBIAR UNOS PUNTOS A TRUE ANTES DE PRODUCCION
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
-    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=30),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=4),
+    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=5),
     "AUTH_HEADER_TYPES": ("Bearer",),
     "SIGNING_KEY": SECRET_KEY,
     "AUTH_COOKIE": "access_token",
     "AUTH_COOKIE_HTTP_ONLY": True,
-    "AUTH_COOKIE_SECURE": True,  # SOLO en producción (HTTPS)
+    "AUTH_COOKIE_SECURE": ENVIRONMENT == "production",
     "AUTH_COOKIE_SAMESITE": "Lax",
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
@@ -187,7 +181,10 @@ CSRF_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
-CSRF_TRUSTED_ORIGINS = ["http://localhost:5173", "https://tudominio.com"]
+CSRF_TRUSTED_ORIGINS = os.getenv(
+    "CSRF_TRUSTED_ORIGINS",
+    "http://localhost:5173,http://127.0.0.1:5173"
+).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
 MIDDLEWARE.insert(0, "product.middleware.SecurityMiddleware")
@@ -212,15 +209,13 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_BROWSER_XSS_FILTER = True
-CONTENT_SECURITY_POLICY = "frame-ancestors 'none'"
-
 
 # default 'none', todo bloqueado menos lo que se especifica
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ("'none'",),
-        "script-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com"),
-        "style-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
+        "script-src": ("'self'", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com"),
+        "style-src": ("'self'", "https://cdn.jsdelivr.net"),
         "img-src": ("'self'", "data:", "https://cdn.jsdelivr.net"),
         "font-src": ("'self'",),
         "frame-src": ("'self'", "https://challenges.cloudflare.com", "https://*.cloudflare.com"),
@@ -251,10 +246,13 @@ if ENVIRONMENT == "production":
     SECURE_HSTS_PRELOAD = True
 
     # cookies solo viajan por HTTPS, nunca por HTTP plano
-    SESSION_COOKIE_SECURE = False
-    CSRF_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = ENVIRONMENT == "production"
+    SESSION_COOKIE_SECURE = ENVIRONMENT == "production"
 
     # Igual se define en el .env cuando ya este en produccion (ruta del vue)
     FRONTEND_URL = os.getenv("FRONTEND_URL", "")
-    if FRONTEND_URL:
-        CSP_CONNECT_SRC += (FRONTEND_URL,)
+    CONTENT_SECURITY_POLICY["DIRECTIVES"]["connect-src"] = (
+        "'self'",
+        "https://challenges.cloudflare.com",
+        *((FRONTEND_URL,) if FRONTEND_URL else ()),
+    )
