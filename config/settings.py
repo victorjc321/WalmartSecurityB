@@ -177,9 +177,11 @@ SIMPLE_JWT = {
 }
 
 # Cookies seguras
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
+SESSION_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SAMESITE = "None"
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True  # necesario para frontend
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
@@ -232,7 +234,7 @@ CONTENT_SECURITY_POLICY = {
 
 
 if ENVIRONMENT == "production":
-    SECURE_SSL_REDIRECT = False #Cambiar a True en produccion
+    SECURE_SSL_REDIRECT = True #Cambiar a True en produccion
 
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -240,8 +242,8 @@ if ENVIRONMENT == "production":
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-    CSRF_COOKIE_SECURE = ENVIRONMENT == "production"
-    SESSION_COOKIE_SECURE = ENVIRONMENT == "production"
+    CSRF_COOKIE_SECURE = False
+    SESSION_COOKIE_SECURE = False
 
     FRONTEND_URL = os.getenv("FRONTEND_URL", "")
     CONTENT_SECURITY_POLICY["DIRECTIVES"]["connect-src"] = (
