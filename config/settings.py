@@ -9,8 +9,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-# detecta el entorno para separar local vs producción
-# pendiente en agregar al .env y usar esta variable en el servidor real
 ENVIRONMENT = os.getenv("DJANGO_ENV", "development")
 
 PASSWORD_HASHERS = [
@@ -178,12 +176,12 @@ SIMPLE_JWT = {
     "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
-# Cookies seguras
+
 SESSION_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_HTTPONLY = True  # necesario para frontend
+CSRF_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
@@ -210,12 +208,10 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 ).split(",")
 
 
-# evita que el navegador adivine el tipo de archivo
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_BROWSER_XSS_FILTER = True
 
-# default 'none', todo bloqueado menos lo que se especifica
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ("'none'",),
