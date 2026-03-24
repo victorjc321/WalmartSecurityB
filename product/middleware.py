@@ -35,7 +35,6 @@ class SecurityMiddleware:
             print("Middleware error:", e)
             raise e
 
-        # 🔥 HEADERS
         if hasattr(response, "__setitem__"):
             if request.path.startswith("/api/"):
                 response["Cache-Control"] = (

@@ -32,16 +32,12 @@ from .utils.critical_token import generar_critical_token
 from django.contrib.sessions.models import Session
 from .models import UserSession
 import pyotp
+from django.conf import settings
 from .turnstile import verificar_turnstile
 from rest_framework_simplejwt.token_blacklist.models import (
     OutstandingToken,
     BlacklistedToken,
 )
-
-
-# ─────────────────────────────────────────
-# Log del admin
-# ─────────────────────────────────────────
 
 
 @api_view(["GET"])
@@ -68,11 +64,6 @@ def registrar_log(user, accion, objeto):
         action_flag=accion,
         change_message="",
     )
-
-
-# ─────────────────────────────────────────
-# CRUD de inventario
-# ─────────────────────────────────────────
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):
@@ -125,11 +116,6 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
             registrar_log(self.request.user, ADDITION, obj)
 
 
-# ─────────────────────────────────────────
-# Login
-# ─────────────────────────────────────────
-
-
 @api_view(["POST"])
 @throttle_classes([IPRateThrottle, LoginRateThrottle])
 @sensitive_variables("password")
@@ -149,7 +135,6 @@ def login_view(request):
     ip = request.META.get("REMOTE_ADDR")
     attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip)
 
-    # 🔒 Verificar bloqueo antes
     if attempt.is_currently_blocked():
         return Response(
             {
@@ -161,11 +146,9 @@ def login_view(request):
 
     user = authenticate(username=username, password=password)
 
-    # ❌ LOGIN FALLIDO
     if not user:
         attempt.attempts += 1
 
-        # 🔥 BLOQUEOS PROGRESIVOS
         if attempt.attempts == 5:
             attempt.blocked_until = now() + timedelta(minutes=10)
             attempt.is_blocked = True
@@ -187,19 +170,16 @@ def login_view(request):
             status=400,
         )
 
-    # ✅ LOGIN CORRECTO → RESET
     attempt.attempts = 0
     attempt.is_blocked = False
     attempt.blocked_until = None
     attempt.save()
 
-    # 🧠 SESIÓN PRE-2FA
     request.session["pre_2fa_user"] = user.id
     request.session["otp_attempts"] = 0
     request.session["otp_blocked_until"] = None
     request.session.modified = True
 
-    # 🔐 TOTP
     totp_obj, created = UserTOTP.objects.get_or_create(
         user=user, defaults={"totp_secret": pyotp.random_base32()}
     )
@@ -224,21 +204,11 @@ def login_view(request):
     return Response({"step": "verify", "mensaje": "Ingresa el código de autenticación"})
 
 
-# ─────────────────────────────────────────
-# Verificar sesión
-# ─────────────────────────────────────────
-
-
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 @throttle_classes([AuthSessionThrottle])
 def check_session(request):
     return Response({"authenticated": True})
-
-
-# ─────────────────────────────────────────
-# Logout
-# ─────────────────────────────────────────
 
 
 @api_view(["POST"])
@@ -255,7 +225,6 @@ def logout_view(request):
         except:
             pass
 
-    # 🔔 NOTIFICACIÓN DISCORD
     if user:
         mensaje = f"LOGOUT\nUsuario: {user.username}"
     else:
@@ -277,7 +246,7 @@ def logout_view(request):
 def session_expired_view(request):
     ip = request.META.get("REMOTE_ADDR")
 
-    mensaje = f"""⚠️ SESIÓN EXPIRADA
+    mensaje = f"""SESIÓN EXPIRADA
 
 IP: {ip}
 Evento: Token expirado o inválido
@@ -325,11 +294,6 @@ def logout_all_view(request):
     return response
 
 
-# ─────────────────────────────────────────
-# Verificar TOTP
-# ─────────────────────────────────────────
-
-
 @api_view(["POST"])
 @throttle_classes([IPRateThrottle, LoginRateThrottle])
 @sensitive_variables("codigo")
@@ -347,14 +311,12 @@ def verificar_totp_view(request):
 
     totp_attempt, created = FailedTOTPAttempt.objects.get_or_create(user=user)
 
-    # ── Verifica bloqueo por usuario ANTES de validar ──
     if totp_attempt.is_currently_blocked():
         return Response(
             {"error": "Acceso temporalmente restringido"},
             status=403,
         )
 
-    # 🔥 CONTROL DE INTENTOS OTP
     attempts = request.session.get("otp_attempts", 0)
     blocked_until = request.session.get("otp_blocked_until")
 
@@ -402,7 +364,6 @@ def verificar_totp_view(request):
         totp_obj.is_configured = True
         totp_obj.save()
 
-        # 🔥 cerrar sesión anterior si existe
     try:
         existing_session = UserSession.objects.get(user=user)
 
@@ -433,7 +394,7 @@ def verificar_totp_view(request):
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="Lax",
         max_age=60 * 10,
     )
@@ -442,7 +403,7 @@ def verificar_totp_view(request):
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=False,
+        secure=settings.ENVIRONMENT == "production",
         samesite="Lax",
         max_age=60 * 60 * 24,
     )
@@ -451,11 +412,6 @@ def verificar_totp_view(request):
     enviar_discord(mensaje, 5763719)
 
     return response
-
-
-# ─────────────────────────────────────────
-# CSRF y Refresh
-# ─────────────────────────────────────────
 
 
 @api_view(["GET"])
@@ -486,7 +442,7 @@ class RefreshView(APIView):
                 key="access_token",
                 value=access_token,
                 httponly=True,
-                secure=False,
+                secure=settings.ENVIRONMENT == "production",
                 samesite="Lax",
                 max_age=60 * 10,
             )
@@ -496,7 +452,7 @@ class RefreshView(APIView):
                     key="refresh_token",
                     value=new_refresh,
                     httponly=True,
-                    secure=False,
+                    secure=settings.ENVIRONMENT == "production",
                     samesite="Lax",
                     max_age=60 * 60 * 24,
                 )
@@ -510,11 +466,6 @@ class RefreshView(APIView):
             response.delete_cookie("access_token")
             response.delete_cookie("refresh_token")
             return response
-
-
-# ─────────────────────────────────────────
-# Bulk Delete — Solo Admin
-# ─────────────────────────────────────────
 
 
 class BulkDeleteView(APIView):
