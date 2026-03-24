@@ -3,6 +3,7 @@ import qrcode
 import io
 from datetime import timedelta
 from django.utils.dateparse import parse_datetime
+from django.contrib.auth import login  # 👈 importa esto arriba
 import base64
 from datetime import timedelta
 from .permissions import PermisoInventario, PermisoBulk
@@ -169,6 +170,8 @@ def login_view(request):
             {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
             status=400,
         )
+
+    login(request, user)
 
     attempt.attempts = 0
     attempt.is_blocked = False
