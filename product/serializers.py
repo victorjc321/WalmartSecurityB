@@ -5,8 +5,6 @@ from django.contrib.auth import authenticate
 import unicodedata
 import re
 
-
-# patrones peligrosos: SQL injection, XSS, ejecución de código
 DANGEROUS_PATTERNS = re.compile(
     r"(--|;|/\*|\*/|xp_|"
     r"UNION\s+SELECT|DROP\s+TABLE|"
@@ -26,17 +24,13 @@ def contains_dangerous_patterns(value: str) -> bool:
 
 
 def sanitize_text(value):
-    # normaliza unicode y limpia espacios
     value = unicodedata.normalize("NFKC", value).strip()
 
-    # bloquea patrones peligrosos
     if contains_dangerous_patterns(value):
         raise serializers.ValidationError("Entrada no permitida.")
 
     return value
 
-
-# validador compartido para username
 USERNAME_VALIDATOR = RegexValidator(
     regex=r"^[a-zA-Z0-9._@+-]+$",
     message="Formato inválido."
@@ -91,19 +85,16 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
-        # bloquea campos extra
         extra = set(self.initial_data.keys()) - set(self.fields.keys())
         if extra:
             raise serializers.ValidationError("Campos no permitidos.")
 
-        # bloquea intentos de escribir campos read_only en PATCH
         read_only_attempted = set(self.initial_data.keys()) & set(self.Meta.read_only_fields)
         if read_only_attempted:
             raise serializers.ValidationError(
                 f"Campos no modificables: {read_only_attempted}"
             )
 
-        # valida relación precio-stock
         price = attrs.get("unit_price")
         stock = attrs.get("quantity_in_stock")
         if price is not None and stock is not None:
@@ -131,22 +122,18 @@ class LoginSerializer(serializers.Serializer):
     )
 
     def validate_username(self, value):
-        # sanitiza username
         return sanitize_text(value)
 
     def validate_password(self, value):
-        # el password tiene más libertad de caracteres, se revisa por separado
         if contains_dangerous_patterns(value):
             raise serializers.ValidationError("Entrada no permitida.")
         return value
 
     def validate(self, attrs):
-        # bloquea campos extra enviados manualmente
         extra = set(self.initial_data.keys()) - set(self.fields.keys())
         if extra:
             raise serializers.ValidationError("Campos no permitidos.")
 
-        # mismo mensaje para usuario inexistente y contraseña incorrecta, evita enumeración
         user = authenticate(
             username=attrs.get("username"),
             password=attrs.get("password")
@@ -174,11 +161,9 @@ class TOTPVerifySerializer(serializers.Serializer):
     )
 
     def validate_username(self, value):
-        # sanitiza username
         return sanitize_text(value)
 
     def validate(self, attrs):
-        # bloquea campos extra enviados manualmente
         extra = set(self.initial_data.keys()) - set(self.fields.keys())
         if extra:
             raise serializers.ValidationError("Campos no permitidos.")

@@ -2,7 +2,6 @@ import requests
 import os
 
 def verificar_turnstile(token: str, ip: str = None) -> bool:
-    """Verifica el token de Cloudflare Turnstile"""
     secret_key = os.getenv("TURNSTILE_SECRET_KEY")
 
     data = {
