@@ -99,8 +99,6 @@ class PermisoInventario(BasePermission):
 
         return False
 
-
-# operaciones bulk
 class PermisoBulk(BasePermission):
     
     message = "Las operaciones masivas requieren rol de Administrador"

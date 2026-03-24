@@ -18,7 +18,6 @@ class SecurityMiddleware:
             print("Middleware error:", e)
             raise e
 
-        # 🔥 SOLO si response es válido
         if hasattr(response, "__setitem__"):
             if request.path.startswith("/api/"):
                 response["Cache-Control"] = (
