@@ -183,7 +183,7 @@ CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173"
+    "http://localhost:5173,http://127.0.0.1:5173,http://52.14.7.155:8000"
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
@@ -201,7 +201,7 @@ STATIC_URL = "static/"
 
 # origins permitidos para CORS, en produccion se lee del .env
 CORS_ALLOWED_ORIGINS = os.getenv(
-    "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173"
+    "CORS_ALLOWED_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,http://52.14.7.155:8000"
 ).split(",")
 
 
