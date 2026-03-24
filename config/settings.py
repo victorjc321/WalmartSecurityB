@@ -50,6 +50,7 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "product.middleware.SecurityMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "csp.middleware.CSPMiddleware",
@@ -129,9 +130,9 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "anon": "2/minute",
         "user": "10/minute",
-         'ip': '60/minute',       
-         'login': '3/minute',
-         'auth_session': '10/minute',
+        "ip": "60/minute",
+        "login": "3/minute",
+        "auth_session": "10/minute",
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -219,11 +220,20 @@ CONTENT_SECURITY_POLICY = "frame-ancestors 'none'"
 CONTENT_SECURITY_POLICY = {
     "DIRECTIVES": {
         "default-src": ("'none'",),
-        "script-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net", "https://challenges.cloudflare.com"),
+        "script-src": (
+            "'self'",
+            "'unsafe-inline'",
+            "https://cdn.jsdelivr.net",
+            "https://challenges.cloudflare.com",
+        ),
         "style-src": ("'self'", "'unsafe-inline'", "https://cdn.jsdelivr.net"),
         "img-src": ("'self'", "data:", "https://cdn.jsdelivr.net"),
         "font-src": ("'self'",),
-        "frame-src": ("'self'", "https://challenges.cloudflare.com", "https://*.cloudflare.com"),
+        "frame-src": (
+            "'self'",
+            "https://challenges.cloudflare.com",
+            "https://*.cloudflare.com",
+        ),
         "frame-ancestors": ("'none'",),
         "connect-src": (
             "'self'",

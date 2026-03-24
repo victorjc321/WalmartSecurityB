@@ -1,5 +1,6 @@
-from .models import BlockedIP
+from .models import BlockedIP, UserSession
 from django.http import JsonResponse
+from django.contrib.auth import logout
 
 
 class SecurityMiddleware:
@@ -9,8 +10,24 @@ class SecurityMiddleware:
     def __call__(self, request):
         ip = request.META.get("REMOTE_ADDR")
 
+        # 🔒 BLOQUEO POR IP
         if BlockedIP.objects.filter(ip=ip, is_active=True).exists():
             return JsonResponse({"error": "IP bloqueada"}, status=403)
+
+        # 🔥 VALIDACIÓN SEGURA (CORREGIDA)
+        if hasattr(request, "user") and request.user.is_authenticated:
+            try:
+                session_db = UserSession.objects.get(user=request.user)
+
+                if session_db.session_key != request.session.session_key:
+                    logout(request)
+                    return JsonResponse(
+                        {"error": "Sesión inválida o iniciada en otro dispositivo"},
+                        status=401,
+                    )
+
+            except UserSession.DoesNotExist:
+                pass
 
         try:
             response = self.get_response(request)
@@ -18,7 +35,7 @@ class SecurityMiddleware:
             print("Middleware error:", e)
             raise e
 
-        # 🔥 SOLO si response es válido
+        # 🔥 HEADERS
         if hasattr(response, "__setitem__"):
             if request.path.startswith("/api/"):
                 response["Cache-Control"] = (

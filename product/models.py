@@ -6,6 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 import uuid
+from django.contrib.auth.models import User
 
 
 class UserTOTP(models.Model):
@@ -105,3 +106,16 @@ class FailedTOTPAttempt(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.attempts} intentos"
+
+    from django.contrib.auth.models import User
+
+
+class UserSession(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)  # 🔥 clave
+    session_key = models.CharField(max_length=255)
+    ip = models.GenericIPAddressField()
+    user_agent = models.TextField()
+    created_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.user.username} - {self.ip}"

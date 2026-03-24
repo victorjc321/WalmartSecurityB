@@ -29,6 +29,8 @@ from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttem
 from .serializers import InventoryItemSerializer
 from .utils.critical_required import requiere_token_critico
 from .utils.critical_token import generar_critical_token
+from django.contrib.sessions.models import Session
+from .models import UserSession
 import pyotp
 from .turnstile import verificar_turnstile
 from rest_framework_simplejwt.token_blacklist.models import (
@@ -261,6 +263,9 @@ def logout_view(request):
 
     enviar_discord(mensaje, 16711680)
 
+    if user:
+        UserSession.objects.filter(user=user).delete()
+
     response = Response({"message": "Logout exitoso"})
     response.delete_cookie("access_token")
     response.delete_cookie("refresh_token")
@@ -397,12 +402,32 @@ def verificar_totp_view(request):
         totp_obj.is_configured = True
         totp_obj.save()
 
+        # 🔥 cerrar sesión anterior si existe
+    try:
+        existing_session = UserSession.objects.get(user=user)
+
+        if existing_session.session_key != request.session.session_key:
+            existing_session.delete()
+
+    except UserSession.DoesNotExist:
+        pass
+
     # 🔐 GENERAR TOKENS
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
 
     response = Response({"message": "Login exitoso"})
+
+    # 🔥 registrar sesión única
+    UserSession.objects.update_or_create(
+        user=user,
+        defaults={
+            "session_key": request.session.session_key,
+            "ip": request.META.get("REMOTE_ADDR"),
+            "user_agent": request.META.get("HTTP_USER_AGENT"),
+        },
+    )
 
     response.set_cookie(
         key="access_token",
