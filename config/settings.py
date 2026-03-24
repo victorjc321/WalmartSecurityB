@@ -125,11 +125,11 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "1/hour",
-        "user": "3/hour",
-         'ip': '10/hour',       
-         'login': '3/hour',
-         'auth_session': '3/hour',
+        "anon": "2/minute",
+        "user": "10/minute",
+         'ip': '60/minute',       
+         'login': '3/minute',
+         'auth_session': '10/minute',
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
@@ -163,8 +163,8 @@ AUTH_PASSWORD_VALIDATORS = [
 ]
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=4),
-    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=5),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=60),
+    "REFRESH_TOKEN_LIFETIME": timedelta(minutes=1),
     "AUTH_HEADER_TYPES": ("Bearer",),
     "SIGNING_KEY": SECRET_KEY,
     "AUTH_COOKIE": "access_token",
@@ -230,26 +230,19 @@ CONTENT_SECURITY_POLICY = {
     }
 }
 
-# ── HTTPS y cookies seguras: solo en producción ──
-# en local no hay HTTPS, activar estos settings lo rompería
-if ENVIRONMENT == "production":
-    # redirige HTTP → HTTPS automáticamente
-    SECURE_SSL_REDIRECT = True
 
-    # Django corre detrás de Nginx en producción
-    # este header le dice a Django que la petición original era HTTPS
+if ENVIRONMENT == "production":
+    SECURE_SSL_REDIRECT = False #Cambiar a True en produccion
+
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
-    # HSTS: el navegador recuerda usar solo HTTPS por 1 año
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
-    # cookies solo viajan por HTTPS, nunca por HTTP plano
     CSRF_COOKIE_SECURE = ENVIRONMENT == "production"
     SESSION_COOKIE_SECURE = ENVIRONMENT == "production"
 
-    # Igual se define en el .env cuando ya este en produccion (ruta del vue)
     FRONTEND_URL = os.getenv("FRONTEND_URL", "")
     CONTENT_SECURITY_POLICY["DIRECTIVES"]["connect-src"] = (
         "'self'",
