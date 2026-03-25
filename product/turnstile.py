@@ -1,6 +1,7 @@
 import requests
 import os
 
+
 def verificar_turnstile(token: str, ip: str = None) -> bool:
     secret_key = os.getenv("TURNSTILE_SECRET_KEY")
 
