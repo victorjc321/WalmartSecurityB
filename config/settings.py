@@ -170,7 +170,7 @@ SIMPLE_JWT = {
     "AUTH_COOKIE": "access_token",
     "AUTH_COOKIE_HTTP_ONLY": True,
     "AUTH_COOKIE_SECURE": ENVIRONMENT == "production",
-    "AUTH_COOKIE_SAMESITE": "Lax",
+    "AUTH_COOKIE_SAMESITE": "None",
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
@@ -180,13 +180,13 @@ SESSION_SAVE_EVERY_REQUEST = True
 SESSION_COOKIE_DOMAIN = None
 SESSION_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SECURE = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_HTTPONLY = False  # necesario para frontend
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_HTTPONLY = True  # necesario para frontend
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173,http://52.14.7.155:8000",
+    "https://walmartsecurityf1.pages.dev",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
@@ -205,7 +205,7 @@ STATIC_URL = "static/"
 # origins permitidos para CORS, en produccion se lee del .env
 CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS",
-    "http://localhost:5173,http://127.0.0.1:5173, http://52.14.7.155:8000",
+    "https://walmartsecurityf1.pages.dev",
 ).split(",")
 
 
@@ -232,9 +232,8 @@ CONTENT_SECURITY_POLICY = {
         "frame-ancestors": ("'none'",),
         "connect-src": (
             "'self'",
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "https://cdn.jsdelivr.net",
+            "https://api.nextsparktech.website",
+            "https://walmartsecurityf1.pages.dev",
             "https://challenges.cloudflare.com",
         ),
     }
@@ -249,9 +248,6 @@ if ENVIRONMENT == "production":
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-
-    CSRF_COOKIE_SECURE = False
-    SESSION_COOKIE_SECURE = False
 
     FRONTEND_URL = os.getenv("FRONTEND_URL", "")
     CONTENT_SECURITY_POLICY["DIRECTIVES"]["connect-src"] = (
