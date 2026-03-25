@@ -397,7 +397,7 @@ def verificar_totp_view(request):
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=settings.ENVIRONMENT == "production",
+        secure=True,
         samesite="None",
         max_age=60 * 10,
     )
@@ -406,7 +406,7 @@ def verificar_totp_view(request):
         key="refresh_token",
         value=refresh_token,
         httponly=True,
-        secure=settings.ENVIRONMENT == "production",
+        secure=True,
         samesite="None",
         max_age=60 * 60 * 24,
     )
