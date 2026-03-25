@@ -3,7 +3,7 @@ import qrcode
 import io
 from datetime import timedelta
 from django.utils.dateparse import parse_datetime
-from django.contrib.auth import login  # 👈 importa esto arriba
+from django.contrib.auth import login
 import base64
 from datetime import timedelta
 from .permissions import PermisoInventario, PermisoBulk
@@ -398,7 +398,7 @@ def verificar_totp_view(request):
         value=access_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
-        samesite="Lax",
+        samesite="None",
         max_age=60 * 10,
     )
 
@@ -407,7 +407,7 @@ def verificar_totp_view(request):
         value=refresh_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
-        samesite="Lax",
+        samesite="None",
         max_age=60 * 60 * 24,
     )
 
@@ -446,7 +446,7 @@ class RefreshView(APIView):
                 value=access_token,
                 httponly=True,
                 secure=settings.ENVIRONMENT == "production",
-                samesite="Lax",
+                samesite="None",
                 max_age=60 * 10,
             )
 
@@ -456,7 +456,7 @@ class RefreshView(APIView):
                     value=new_refresh,
                     httponly=True,
                     secure=settings.ENVIRONMENT == "production",
-                    samesite="Lax",
+                    samesite="None",
                     max_age=60 * 60 * 24,
                 )
 
