@@ -182,7 +182,7 @@ SESSION_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_HTTPONLY = True  # necesario para frontend
+CSRF_COOKIE_HTTPONLY = True
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
@@ -241,7 +241,7 @@ CONTENT_SECURITY_POLICY = {
 
 
 if ENVIRONMENT == "production":
-    SECURE_SSL_REDIRECT = True  # Cambiar a True en produccion
+    SECURE_SSL_REDIRECT = True
 
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
