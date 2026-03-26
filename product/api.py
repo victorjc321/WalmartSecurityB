@@ -171,7 +171,7 @@ def login_view(request):
             status=400,
         )
 
-    login(request, user)
+    # login(request, user)
 
     attempt.attempts = 0
     attempt.is_blocked = False
