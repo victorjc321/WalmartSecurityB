@@ -239,8 +239,9 @@ def logout_view(request):
         UserSession.objects.filter(user=user).delete()
 
     response = Response({"message": "Logout exitoso"})
-    response.delete_cookie("access_token")
-    response.delete_cookie("refresh_token")
+    response.delete_cookie("access_token", path="/", samesite="None", secure=True)
+    response.delete_cookie("refresh_token", path="/", samesite="None", secure=True)
+    response.delete_cookie("sessionid", path="/", secure=True)
 
     return response
 
