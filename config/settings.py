@@ -200,7 +200,9 @@ TIME_ZONE = "America/Mexico_City"
 USE_I18N = True
 USE_TZ = True
 
-STATIC_URL = "static/"
+
+STATIC_URL = "/static/"
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # origins permitidos para CORS, en produccion se lee del .env
 CORS_ALLOWED_ORIGINS = os.getenv(
@@ -241,7 +243,7 @@ CONTENT_SECURITY_POLICY = {
 
 
 if ENVIRONMENT == "production":
-    SECURE_SSL_REDIRECT = False  # Cambiar a True en produccion
+    SECURE_SSL_REDIRECT = True
 
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -254,5 +256,6 @@ if ENVIRONMENT == "production":
         "'self'",
         "https://challenges.cloudflare.com",
         "https://api.nextsparktech.website",
+        "'unsafe-inline'",
         *((FRONTEND_URL,) if FRONTEND_URL else ()),
     )
