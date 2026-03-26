@@ -208,7 +208,6 @@ def login_view(request):
 
 
 @api_view(["GET"])
-@permission_classes([IsAuthenticated])
 @throttle_classes([AuthSessionThrottle])
 def check_session(request):
     return Response({"authenticated": True})
@@ -383,7 +382,6 @@ def verificar_totp_view(request):
 
     response = Response({"message": "Login exitoso"})
 
-    # 🔥 registrar sesión única
     UserSession.objects.update_or_create(
         user=user,
         defaults={
