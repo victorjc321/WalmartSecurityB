@@ -208,6 +208,7 @@ def login_view(request):
 
 
 @api_view(["GET"])
+@permission_classes([IsAuthenticated])
 @throttle_classes([AuthSessionThrottle])
 def check_session(request):
     return Response({"authenticated": True})

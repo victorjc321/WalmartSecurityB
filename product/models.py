@@ -111,7 +111,7 @@ class FailedTOTPAttempt(models.Model):
 
 
 class UserSession(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE)  # 🔥 clave
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
     session_key = models.CharField(max_length=255)
     ip = models.GenericIPAddressField()
     user_agent = models.TextField()
