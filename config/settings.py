@@ -253,5 +253,6 @@ if ENVIRONMENT == "production":
     CONTENT_SECURITY_POLICY["DIRECTIVES"]["connect-src"] = (
         "'self'",
         "https://challenges.cloudflare.com",
+        "https://api.nextsparktech.website",
         *((FRONTEND_URL,) if FRONTEND_URL else ()),
     )
