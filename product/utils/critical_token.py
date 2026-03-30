@@ -3,9 +3,7 @@ import uuid
 from django.conf import settings
 from django.utils.timezone import now
 from datetime import timedelta
-
-
-USED_TOKENS = set()
+from product.models import UsedCriticalToken
 
 
 def generar_critical_token(user, session_key):
@@ -31,7 +29,7 @@ def validar_critical_token(token, user, session_key):
 
         jti = payload.get("jti")
 
-        if jti in USED_TOKENS:
+        if not jti:
             return False
 
         if payload["user_id"] != user.id:
@@ -40,7 +38,9 @@ def validar_critical_token(token, user, session_key):
         if payload["session_key"] != session_key:
             return False
 
-        USED_TOKENS.add(jti)
+        obj, created = UsedCriticalToken.objects.get_or_create(jti=jti)
+        if not created:
+            return False
 
         return True
 

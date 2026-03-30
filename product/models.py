@@ -6,6 +6,7 @@ from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
 import uuid
+from django.db import models
 from django.contrib.auth.models import User
 
 
@@ -119,3 +120,11 @@ class UserSession(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.ip}"
+
+
+class UsedCriticalToken(models.Model):
+    jti = models.CharField(max_length=255, unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.jti
