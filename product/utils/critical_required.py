@@ -9,4 +9,6 @@ def requiere_token_critico(request):
     if not token:
         return False
 
-    return validar_critical_token(token, request.user, request.session.session_key)
+    return validar_critical_token(
+        token, request.user, request.session.session_key, request
+    )
