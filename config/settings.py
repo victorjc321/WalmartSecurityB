@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from corsheaders.defaults import default_headers
 
 load_dotenv()
 
@@ -22,8 +23,8 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
-# Discord Webhook URL
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -101,7 +102,6 @@ DATABASES = {
     }
 }
 
-# ── Errores genéricos via DRF ──
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": (
@@ -189,6 +189,11 @@ CSRF_TRUSTED_ORIGINS = os.getenv(
     "https://walmartsecurityf1.pages.dev,https://api.nextsparktech.website",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
+
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-critical-token",
+]
 
 MIDDLEWARE.insert(0, "product.middleware.SecurityMiddleware")
 
