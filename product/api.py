@@ -90,12 +90,33 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        partial = kwargs.pop("partial", False)
-        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+
+        data = request.data
+
+        cambio_critico = False
+
+        if "unit_price" in data:
+            if float(data["unit_price"]) != float(instance.unit_price):
+                cambio_critico = True
+
+        if "quantity_in_stock" in data:
+            diferencia = abs(
+                int(data["quantity_in_stock"]) - instance.quantity_in_stock
+            )
+            if diferencia >= 10:
+                cambio_critico = True
+
+        if cambio_critico:
+            if not requiere_token_critico(request):
+                return Response({"error": "Requiere verificación crítica"}, status=403)
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         obj = serializer.save()
+
         if request.user.is_authenticated:
             registrar_log(request.user, CHANGE, obj)
+
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):

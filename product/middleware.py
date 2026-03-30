@@ -10,11 +10,9 @@ class SecurityMiddleware:
     def __call__(self, request):
         ip = request.META.get("REMOTE_ADDR")
 
-        # 🔒 BLOQUEO POR IP
         if BlockedIP.objects.filter(ip=ip, is_active=True).exists():
             return JsonResponse({"error": "IP bloqueada"}, status=403)
 
-        # 🔥 VALIDACIÓN SEGURA (CORREGIDA)
         if hasattr(request, "user") and request.user.is_authenticated:
             try:
                 session_db = UserSession.objects.get(user=request.user)
