@@ -186,7 +186,7 @@ CSRF_COOKIE_HTTPONLY = True  # necesario para frontend
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
-    "https://walmartsecurityf1.pages.dev",
+    "https://walmartsecurityf1.pages.dev,https://api.nextsparktech.website",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
 
