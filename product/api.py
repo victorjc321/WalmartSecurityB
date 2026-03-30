@@ -398,7 +398,6 @@ def verificar_totp_view(request):
     except UserSession.DoesNotExist:
         pass
 
-    # 🔐 GENERAR TOKENS
     refresh = RefreshToken.for_user(user)
     access_token = str(refresh.access_token)
     refresh_token = str(refresh)
