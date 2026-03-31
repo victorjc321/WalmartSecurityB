@@ -1,5 +1,5 @@
 from django.db import models
-from django.core.validators import MinValueValidator
+from django.core.validators import MinValueValidator, MaxValueValidator
 import pyotp
 from django.contrib.auth.models import User
 from django.utils import timezone
@@ -7,7 +7,6 @@ from datetime import timedelta
 from decimal import Decimal
 import uuid
 from django.contrib.auth.models import User
-
 
 class UserTOTP(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -35,6 +34,27 @@ class InventoryItem(models.Model):
         db_table = "inventory_asset"
         ordering = ["-created_at"]
 
+class ReviewInventory(models.Model):
+    review_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    item = models.ForeignKey(
+        InventoryItem,
+        on_delete=models.CASCADE,
+        related_name="reviews",
+        db_column="item_id",
+    )
+    rating = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+    )
+    comment = models.TextField()
+    reviewed_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.item.product_name
+
+    class Meta:
+        db_table = "inventory_review"
+        ordering = ["-reviewed_at"]
+    
 
 class BlockedIP(models.Model):
     ip = models.GenericIPAddressField(unique=True)
