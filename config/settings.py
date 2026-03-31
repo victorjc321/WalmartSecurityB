@@ -173,7 +173,6 @@ SIMPLE_JWT = {
     "AUTH_COOKIE_SAMESITE": "None",
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
-    "AUTH_HEADER_TYPES": ("Bearer",),
 }
 
 SESSION_SAVE_EVERY_REQUEST = True
@@ -248,7 +247,7 @@ CONTENT_SECURITY_POLICY = {
 
 
 if ENVIRONMENT == "production":
-    SECURE_SSL_REDIRECT = False  # Cambiar a True en produccion
+    SECURE_SSL_REDIRECT = os.getenv("SECURE_SSL_REDIRECT", "False") == "True"
 
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -263,5 +262,3 @@ if ENVIRONMENT == "production":
         "https://api.nextsparktech.website",
         *((FRONTEND_URL,) if FRONTEND_URL else ()),
     )
-
-# Listo Para Bajar y Empiecen a trabajar
