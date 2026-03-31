@@ -25,12 +25,15 @@ class SecurityMiddleware:
                     or session_db.ip != current_ip
                     or session_db.user_agent != current_agent
                 ):
+                    user = request.user
+
                     logout(request)
-                    UserSession.objects.filter(user=request.user).delete()
+
+                    UserSession.objects.filter(user=user).delete()
 
                     return JsonResponse(
                         {
-                            "error": "Posible Robo de sesion detectado o iniciada en otro dispositivo"
+                            "error": "Posible robo de sesión detectado o sesión en otro dispositivo"
                         },
                         status=401,
                     )
@@ -38,18 +41,11 @@ class SecurityMiddleware:
             except UserSession.DoesNotExist:
                 pass
 
-        try:
-            response = self.get_response(request)
-        except Exception as e:
-            print("Middleware error:", e)
-            raise e
+        response = self.get_response(request)
 
-        if hasattr(response, "__setitem__"):
-            if request.path.startswith("/api/"):
-                response["Cache-Control"] = (
-                    "no-store, no-cache, must-revalidate, max-age=0"
-                )
-                response["Pragma"] = "no-cache"
-                response["Expires"] = "0"
+        if hasattr(response, "__setitem__") and request.path.startswith("/api/"):
+            response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response["Pragma"] = "no-cache"
+            response["Expires"] = "0"
 
         return response
