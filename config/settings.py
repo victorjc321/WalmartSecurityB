@@ -2,6 +2,7 @@ from pathlib import Path
 import os
 from datetime import timedelta
 from dotenv import load_dotenv
+from corsheaders.defaults import default_headers
 
 load_dotenv()
 
@@ -22,8 +23,8 @@ DEBUG = os.getenv("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
-# Discord Webhook URL
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -101,7 +102,6 @@ DATABASES = {
     }
 }
 
-# ── Errores genéricos via DRF ──
 
 REST_FRAMEWORK = {
     "DEFAULT_RENDERER_CLASSES": (
@@ -180,15 +180,20 @@ SESSION_SAVE_EVERY_REQUEST = True
 SESSION_COOKIE_DOMAIN = None
 SESSION_COOKIE_SAMESITE = "None"
 CSRF_COOKIE_SAMESITE = "None"
-CSRF_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = True
 SESSION_COOKIE_SECURE = True
 CSRF_COOKIE_HTTPONLY = True  # necesario para frontend
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
 CSRF_TRUSTED_ORIGINS = os.getenv(
     "CSRF_TRUSTED_ORIGINS",
-    "https://walmartsecurityf1.pages.dev",
+    "https://walmartsecurityf1.pages.dev,https://api.nextsparktech.website",
 ).split(",")
 CORS_ALLOW_CREDENTIALS = True
+
+
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "x-critical-token",
+]
 
 MIDDLEWARE.insert(0, "product.middleware.SecurityMiddleware")
 
@@ -258,3 +263,5 @@ if ENVIRONMENT == "production":
         "https://api.nextsparktech.website",
         *((FRONTEND_URL,) if FRONTEND_URL else ()),
     )
+
+# Listo Para Bajar y Empiecen a trabajar

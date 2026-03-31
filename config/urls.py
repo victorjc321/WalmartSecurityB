@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from product.api import mi_rol_view
+from product.api import session_expired_view
 from django.http import JsonResponse
 from product.api import (
     login_view,
@@ -30,6 +31,7 @@ urlpatterns = [
     path("refresh/", RefreshView.as_view()),
     path("logout-all/", logout_all_view),
     path("api/check-session/", check_session),
+    path("api/session-expired/", session_expired_view),
     path("api/mi-rol/", mi_rol_view),
     path("api/verify-critical/", verify_critical_view),
     path(
