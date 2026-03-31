@@ -17,10 +17,21 @@ class SecurityMiddleware:
             try:
                 session_db = UserSession.objects.get(user=request.user)
 
-                if session_db.session_key != request.session.session_key:
+                current_ip = request.META.get("REMOTE_ADDR")
+                current_agent = request.META.get("HTTP_USER_AGENT")
+
+                if (
+                    session_db.session_key != request.session.session_key
+                    or session_db.ip != current_ip
+                    or session_db.user_agent != current_agent
+                ):
                     logout(request)
+                    UserSession.objects.filter(user=request.user).delete()
+
                     return JsonResponse(
-                        {"error": "Sesión inválida o iniciada en otro dispositivo"},
+                        {
+                            "error": "Posible Robo de sesion detectado o iniciada en otro dispositivo"
+                        },
                         status=401,
                     )
 
