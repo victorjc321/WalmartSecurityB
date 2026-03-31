@@ -10,6 +10,7 @@ from .permissions import PermisoInventario, PermisoBulk
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
 from django.utils import timezone
+from django.contrib.auth import logout
 from rest_framework import viewsets, permissions
 from rest_framework.decorators import api_view, throttle_classes, permission_classes
 from rest_framework.response import Response
@@ -258,6 +259,8 @@ def logout_view(request):
 
     if user:
         UserSession.objects.filter(user=user).delete()
+
+        logout(request)
 
     response = Response({"message": "Logout exitoso"})
     response.delete_cookie("access_token", path="/", samesite="None")
