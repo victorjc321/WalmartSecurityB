@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import InventoryItem, Supplier
+from .models import InventoryItem, Supplier, ReviewInventory
 from django.core.validators import RegexValidator
 from django.contrib.auth import authenticate
 import unicodedata
@@ -36,7 +36,7 @@ USERNAME_VALIDATOR = RegexValidator(
     message="Formato inválido."
 )
 
-
+# Serializador del inventario
 class InventoryItemSerializer(serializers.ModelSerializer):
 
     product_name = serializers.CharField(
@@ -105,7 +105,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
         return attrs
 
-
+# Serializacion de login
 class LoginSerializer(serializers.Serializer):
 
     username = serializers.CharField(
@@ -146,7 +146,7 @@ class LoginSerializer(serializers.Serializer):
         attrs["user"] = user
         return attrs
 
-
+# Serializador de verificación TOTP
 class TOTPVerifySerializer(serializers.Serializer):
 
     username = serializers.CharField(
@@ -193,3 +193,47 @@ class SupplierSerializer(serializers.ModelSerializer):
         if query.exists():
             raise serializers.ValidationError("Este proveedor ya existe.")
         return value
+    
+# Serializacion de resenas
+class ReviewInventorySerializer(serializers.ModelSerializer):
+
+    product_name = serializers.CharField(source="item.product_name", read_only=True)
+
+    rating = serializers.IntegerField(
+        min_value=1,
+        max_value=5
+    )
+
+    comment = serializers.CharField(
+        min_length=3,
+        max_length=500,
+        trim_whitespace=True
+    )
+
+    class Meta:
+        model = ReviewInventory
+        fields = (
+            'review_id',
+            'item',
+            'product_name',
+            'rating',
+            'comment',
+            'reviewed_at'
+        )
+        read_only_fields = ('review_id', 'reviewed_at', 'product_name')
+
+    def validate_comment(self, value):
+        return sanitize_text(value)
+
+    def validate(self, attrs):
+        extra = set(self.initial_data.keys()) - set(self.fields.keys())
+        if extra:
+            raise serializers.ValidationError("Campos no permitidos.")
+
+        read_only_attempted = set(self.initial_data.keys()) & set(self.Meta.read_only_fields)
+        if read_only_attempted:
+            raise serializers.ValidationError(
+                f"Campos no modificables: {read_only_attempted}"
+            )
+
+        return attrs

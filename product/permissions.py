@@ -114,3 +114,53 @@ class PermisoBulk(BasePermission):
 
     def has_object_permission(self, request, view, obj):
         return tiene_rol(request.user, "Admin") and request.user.is_active
+
+# Permisos para las reseñas de inventario
+class PermisoReview(BasePermission):
+    """
+    GET    → Empleado, Gerente, Admin
+    POST   → Empleado, Gerente, Admin
+    PUT    → Gerente, Admin
+    PATCH  → Gerente, Admin
+    DELETE → Solo Admin
+    """
+    message = "No tienes permisos para esta acción"
+
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if not request.user.groups.exists():
+            return False
+
+        if request.method == "GET":
+            return tiene_rol(request.user, "Empleado", "Gerente", "Admin")
+
+        if request.method == "POST":
+            return tiene_rol(request.user, "Empleado", "Gerente", "Admin")
+
+        if request.method in ["PUT", "PATCH"]:
+            return tiene_rol(request.user, "Gerente", "Admin")
+
+        if request.method == "DELETE":
+            return tiene_rol(request.user, "Admin") and request.user.is_active
+
+        return False
+
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        if not request.user.groups.exists():
+            return False
+
+        if request.method == "GET":
+            return tiene_rol(request.user, "Empleado", "Gerente", "Admin")
+
+        if request.method in ["PUT", "PATCH"]:
+            return tiene_rol(request.user, "Gerente", "Admin")
+
+        if request.method == "DELETE":
+            return tiene_rol(request.user, "Admin") and request.user.is_active
+
+        return False

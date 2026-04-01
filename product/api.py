@@ -6,7 +6,7 @@ from django.utils.dateparse import parse_datetime
 from django.contrib.auth import login
 import base64
 from datetime import timedelta
-from .permissions import PermisoInventario, PermisoBulk
+from .permissions import PermisoInventario, PermisoBulk, PermisoReview
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
 from django.utils import timezone
@@ -27,8 +27,8 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
 from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from rest_framework.throttling import UserRateThrottle
-from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt, Supplier
-from .serializers import InventoryItemSerializer, SupplierSerializer
+from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt, Supplier, ReviewInventory
+from .serializers import InventoryItemSerializer, SupplierSerializer, ReviewInventorySerializer
 from .utils.critical_required import requiere_token_critico
 from .utils.critical_token import generar_critical_token
 from django.contrib.sessions.models import Session
@@ -538,3 +538,45 @@ class SupplierViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save()
+
+# Tabla de reseñas del inventario
+class ReviewInventoryViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewInventorySerializer
+    permission_classes = [PermisoReview]
+    throttle_classes = [IPRateThrottle, UserRateThrottle]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if not user or not user.is_authenticated:
+            return ReviewInventory.objects.none()
+
+        if not user.groups.exists():
+            return ReviewInventory.objects.none()
+
+        return ReviewInventory.objects.all()
+
+    def perform_create(self, serializer):
+        obj = serializer.save()
+        if self.request.user.is_authenticated:
+            registrar_log(self.request.user, ADDITION, obj)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+
+        if request.user.is_authenticated:
+            registrar_log(request.user, CHANGE, obj)
+
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+
+        if request.user.is_authenticated:
+            registrar_log(request.user, DELETION, instance)
+
+        instance.delete()
+        return Response(status=204)
