@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.admin.models import LogEntry
-from .models import InventoryItem
+from .models import InventoryItem, Supplier
 
 
 @admin.register(InventoryItem)
@@ -25,3 +25,10 @@ class LogEntryAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(Supplier)
+class SupplierAdmin(admin.ModelAdmin):
+    list_display = ("name", "contact_name", "email", "phone", "created_at")
+    search_fields = ("name", "contact_name", "email")
+    list_filter = ("created_at",)
