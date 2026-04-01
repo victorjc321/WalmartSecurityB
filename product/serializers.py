@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import InventoryItem
+from .models import InventoryItem, Supplier
 from django.core.validators import RegexValidator
 from django.contrib.auth import authenticate
 import unicodedata
@@ -105,6 +105,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
         return attrs
 
+
 class LoginSerializer(serializers.Serializer):
 
     username = serializers.CharField(
@@ -169,3 +170,60 @@ class TOTPVerifySerializer(serializers.Serializer):
             raise serializers.ValidationError("Campos no permitidos.")
 
         return attrs
+
+
+class SupplierSerializer(serializers.ModelSerializer):
+
+    name = serializers.CharField(
+        min_length=2,
+        max_length=255,
+        trim_whitespace=True,
+    )
+
+    contact_name = serializers.CharField(
+        max_length=255,
+        trim_whitespace=True,
+        required=False,
+        allow_blank=True,
+    )
+
+    email = serializers.EmailField(
+        max_length=255,
+        required=False,
+        allow_blank=True,
+    )
+
+    phone = serializers.CharField(
+        max_length=20,
+        trim_whitespace=True,
+        required=False,
+        allow_blank=True,
+    )
+
+    address = serializers.CharField(
+        required=False,
+        allow_blank=True,
+    )
+
+    class Meta:
+        model = Supplier
+        fields = (
+            'supplier_id',
+            'name',
+            'contact_name',
+            'email',
+            'phone',
+            'address',
+            'created_at',
+            'updated_at',
+        )
+        read_only_fields = ('supplier_id', 'created_at', 'updated_at')
+
+    def validate_name(self, value):
+        value = sanitize_text(value)
+        query = Supplier.objects.filter(name__iexact=value)
+        if self.instance:
+            query = query.exclude(pk=self.instance.pk)
+        if query.exists():
+            raise serializers.ValidationError("Este proveedor ya existe.")
+        return value

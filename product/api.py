@@ -27,8 +27,8 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
 from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from rest_framework.throttling import UserRateThrottle
-from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt
-from .serializers import InventoryItemSerializer
+from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt, Supplier
+from .serializers import InventoryItemSerializer, SupplierSerializer
 from .utils.critical_required import requiere_token_critico
 from .utils.critical_token import generar_critical_token
 from django.contrib.sessions.models import Session
@@ -527,3 +527,14 @@ class BulkDeleteView(APIView):
         enviar_discord(mensaje, 15158332)
 
         return Response({"message": f"{count} productos eliminados"}, status=200)
+
+class SupplierViewSet(viewsets.ModelViewSet):
+    serializer_class = SupplierSerializer
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [IPRateThrottle, UserRateThrottle]
+
+    def get_queryset(self):
+        return Supplier.objects.all()
+
+    def perform_create(self, serializer):
+        serializer.save()
