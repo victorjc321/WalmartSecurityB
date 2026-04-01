@@ -29,6 +29,6 @@ class LogEntryAdmin(admin.ModelAdmin):
 
 @admin.register(Supplier)
 class SupplierAdmin(admin.ModelAdmin):
-    list_display = ("name", "contact_name", "email", "phone", "created_at")
-    search_fields = ("name", "contact_name", "email")
+    list_display = ("name", "created_at")
+    search_fields = ("name",)
     list_filter = ("created_at",)

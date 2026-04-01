@@ -180,43 +180,9 @@ class SupplierSerializer(serializers.ModelSerializer):
         trim_whitespace=True,
     )
 
-    contact_name = serializers.CharField(
-        max_length=255,
-        trim_whitespace=True,
-        required=False,
-        allow_blank=True,
-    )
-
-    email = serializers.EmailField(
-        max_length=255,
-        required=False,
-        allow_blank=True,
-    )
-
-    phone = serializers.CharField(
-        max_length=20,
-        trim_whitespace=True,
-        required=False,
-        allow_blank=True,
-    )
-
-    address = serializers.CharField(
-        required=False,
-        allow_blank=True,
-    )
-
     class Meta:
         model = Supplier
-        fields = (
-            'supplier_id',
-            'name',
-            'contact_name',
-            'email',
-            'phone',
-            'address',
-            'created_at',
-            'updated_at',
-        )
+        fields = ('supplier_id', 'name', 'created_at', 'updated_at')
         read_only_fields = ('supplier_id', 'created_at', 'updated_at')
 
     def validate_name(self, value):
