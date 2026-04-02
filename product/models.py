@@ -25,6 +25,15 @@ class InventoryItem(models.Model):
         max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.00"))]
     )
     quantity_in_stock = models.PositiveIntegerField(validators=[MinValueValidator(0)])
+    
+    supplier = models.ForeignKey(
+        'Supplier',
+        on_delete=models.PROTECT,
+        related_name='products',
+        null=True,        # temporal-----quitar 
+        blank=True,       # temporal-----quitar
+        db_column='supplier_id'
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

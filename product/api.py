@@ -82,7 +82,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         if not user.groups.exists():
             return InventoryItem.objects.none()
 
-        return InventoryItem.objects.all()
+        return InventoryItem.objects.select_related('supplier').all() 
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()

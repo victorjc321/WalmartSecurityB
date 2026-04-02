@@ -38,6 +38,8 @@ USERNAME_VALIDATOR = RegexValidator(
 
 # Serializador del inventario
 class InventoryItemSerializer(serializers.ModelSerializer):
+    
+    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
 
     product_name = serializers.CharField(
         min_length=3,
@@ -70,10 +72,12 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             'product_name',
             'unit_price',
             'quantity_in_stock',
+            'supplier',       
+            'supplier_name',   
             'created_at',
             'updated_at'
         )
-        read_only_fields = ('item_id', 'created_at', 'updated_at')
+        read_only_fields = ('item_id', 'created_at', 'updated_at', 'supplier_name')
 
     def validate_product_name(self, value):
         value = sanitize_text(value)
