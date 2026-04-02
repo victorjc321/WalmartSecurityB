@@ -87,6 +87,11 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         if query.exists():
             raise serializers.ValidationError("Este producto ya existe.")
         return value
+    
+    def validate_supplier(self, value):
+        if not Supplier.objects.filter(supplier_id=value.pk).exists():
+            raise serializers.ValidationError("El proveedor especificado no existe.")
+        return value
 
     def validate(self, attrs):
         extra = set(self.initial_data.keys()) - set(self.fields.keys())
@@ -98,7 +103,10 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 f"Campos no modificables: {read_only_attempted}"
             )
-
+        supplier = attrs.get("supplier")
+        if supplier is None:
+            raise serializers.ValidationError("El proveedor es obligatorio.")
+        
         price = attrs.get("unit_price")
         stock = attrs.get("quantity_in_stock")
         if price is not None and stock is not None:
@@ -155,7 +163,7 @@ class TOTPVerifySerializer(serializers.Serializer):
 
     username = serializers.CharField(
         min_length=3,
-        max_length=150,
+        max_length=16,
         trim_whitespace=True,
         validators=[USERNAME_VALIDATOR]
     )
@@ -179,8 +187,8 @@ class TOTPVerifySerializer(serializers.Serializer):
 class SupplierSerializer(serializers.ModelSerializer):
 
     name = serializers.CharField(
-        min_length=2,
-        max_length=255,
+        min_length=3,
+        max_length=20,
         trim_whitespace=True,
     )
 
@@ -197,6 +205,18 @@ class SupplierSerializer(serializers.ModelSerializer):
         if query.exists():
             raise serializers.ValidationError("Este proveedor ya existe.")
         return value
+
+    def validate(self, attrs):
+        extra = set(self.initial_data.keys()) - set(self.fields.keys())
+        if extra:
+            raise serializers.ValidationError("Campos no permitidos.")
+
+        read_only_attempted = set(self.initial_data.keys()) & set(self.Meta.read_only_fields)
+        if read_only_attempted:
+            raise serializers.ValidationError(
+                f"Campos no modificables: {read_only_attempted}"
+            )
+        return attrs
     
 # Serializacion de resenas
 class ReviewInventorySerializer(serializers.ModelSerializer):

@@ -530,15 +530,80 @@ class BulkDeleteView(APIView):
 
 class SupplierViewSet(viewsets.ModelViewSet):
     serializer_class = SupplierSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [PermisoInventario]
     throttle_classes = [IPRateThrottle, UserRateThrottle]
 
     def get_queryset(self):
+        user = self.request.user
+
+        if not user or not user.is_authenticated:
+            return Supplier.objects.none()
+
+        if not user.groups.exists():
+            return Supplier.objects.none()
+
         return Supplier.objects.all()
 
     def perform_create(self, serializer):
-        serializer.save()
+        obj = serializer.save()
+        if self.request.user.is_authenticated:
+            LogEntry.objects.create(
+                user_id=self.request.user.id,
+                content_type=ContentType.objects.get_for_model(Supplier),
+                object_id=str(obj.pk),
+                object_repr=str(obj)[:200],
+                action_flag=ADDITION,
+                change_message="",
+            )
 
+    def update(self, request, *args, **kwargs):
+        if not requiere_token_critico(request):
+            return Response({"error": "Requiere verificación crítica"}, status=403)
+
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        obj = serializer.save()
+
+        if request.user.is_authenticated:
+            LogEntry.objects.create(
+                user_id=request.user.id,
+                content_type=ContentType.objects.get_for_model(Supplier),
+                object_id=str(obj.pk),
+                object_repr=str(obj)[:200],
+                action_flag=CHANGE,
+                change_message="",
+            )
+
+        return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        if not requiere_token_critico(request):
+            return Response({"error": "Requiere verificación crítica"}, status=403)
+
+        instance = self.get_object()
+
+        if instance.products.exists():
+            return Response(
+                {"error": "No se puede eliminar un proveedor con productos asignados."},
+                status=400
+            )
+
+        if request.user.is_authenticated:
+            LogEntry.objects.create(
+                user_id=request.user.id,
+                content_type=ContentType.objects.get_for_model(Supplier),
+                object_id=str(instance.pk),
+                object_repr=str(instance)[:200],
+                action_flag=DELETION,
+                change_message="",
+            )
+
+        instance.delete()
+        return Response(status=204)
+
+
+#·---------------------------
 # Tabla de reseñas del inventario
 class ReviewInventoryViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewInventorySerializer
