@@ -5,6 +5,7 @@ from datetime import timedelta
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import login
 import base64
+from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle, SupplierCreateThrottle
 from datetime import timedelta
 from .permissions import PermisoInventario, PermisoBulk, PermisoReview
 from .discord_logger import enviar_discord
@@ -532,6 +533,12 @@ class SupplierViewSet(viewsets.ModelViewSet):
     serializer_class = SupplierSerializer
     permission_classes = [PermisoInventario]
     throttle_classes = [IPRateThrottle, UserRateThrottle]
+    
+    
+    def get_throttles(self):
+            if self.action == 'create':
+                return [IPRateThrottle(), SupplierCreateThrottle()]
+            return [IPRateThrottle(), UserRateThrottle()]
 
     def get_queryset(self):
         user = self.request.user

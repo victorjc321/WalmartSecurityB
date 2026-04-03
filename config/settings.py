@@ -130,6 +130,7 @@ REST_FRAMEWORK = {
         "ip": "15/minute",
         "login": "5/minute",
         "auth_session": "15/minute",
+        "supplier_create": "10/hour",
     },
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }

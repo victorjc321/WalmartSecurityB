@@ -1,4 +1,4 @@
-from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.throttling import SimpleRateThrottle, UserRateThrottle
 from django.conf import settings
 
 
@@ -32,3 +32,14 @@ class AuthSessionThrottle(SimpleRateThrottle):
     def get_cache_key(self, request, view):
         ip = get_ip(request)
         return self.cache_format % {"scope": self.scope, "ident": ip}
+
+
+class SupplierCreateThrottle(UserRateThrottle):
+    scope = "supplier_create"
+
+    def get_cache_key(self, request, view):
+        ip = get_ip(request)
+        return self.cache_format % {
+            "scope": self.scope,
+            "ident": ip
+        }

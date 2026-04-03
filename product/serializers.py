@@ -15,7 +15,7 @@ DANGEROUS_PATTERNS = re.compile(
     r"eval\s*\(|exec\s*\(|system\s*\(|"
     r"__import__|subprocess|os\.system|"
     r"base64\s*,|\\x[0-9a-fA-F]{2})",
-    re.IGNORECASE
+    re.IGNORECASE,
 )
 
 
@@ -31,15 +31,16 @@ def sanitize_text(value):
 
     return value
 
+
 USERNAME_VALIDATOR = RegexValidator(
-    regex=r"^[a-zA-Z0-9._@+-]+$",
-    message="Formato inválido."
+    regex=r"^[a-zA-Z0-9._@+-]+$", message="Formato inválido."
 )
+
 
 # Serializador del inventario
 class InventoryItemSerializer(serializers.ModelSerializer):
-    
-    supplier_name = serializers.CharField(source='supplier.name', read_only=True)
+
+    supplier_name = serializers.CharField(source="supplier.name", read_only=True)
 
     product_name = serializers.CharField(
         min_length=3,
@@ -48,36 +49,30 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         validators=[
             RegexValidator(
                 regex=r"^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s\-\(\)\.]+$",
-                message="El nombre contiene caracteres no permitidos."
+                message="El nombre contiene caracteres no permitidos.",
             )
-        ]
+        ],
     )
 
     unit_price = serializers.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        min_value=0.01,
-        max_value=100000
+        max_digits=10, decimal_places=2, min_value=0.01, max_value=100000
     )
 
-    quantity_in_stock = serializers.IntegerField(
-        min_value=0,
-        max_value=200
-    )
+    quantity_in_stock = serializers.IntegerField(min_value=0, max_value=200)
 
     class Meta:
         model = InventoryItem
         fields = (
-            'item_id',
-            'product_name',
-            'unit_price',
-            'quantity_in_stock',
-            'supplier',       
-            'supplier_name',   
-            'created_at',
-            'updated_at'
+            "item_id",
+            "product_name",
+            "unit_price",
+            "quantity_in_stock",
+            "supplier",
+            "supplier_name",
+            "created_at",
+            "updated_at",
         )
-        read_only_fields = ('item_id', 'created_at', 'updated_at', 'supplier_name')
+        read_only_fields = ("item_id", "created_at", "updated_at", "supplier_name")
 
     def validate_product_name(self, value):
         value = sanitize_text(value)
@@ -87,7 +82,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         if query.exists():
             raise serializers.ValidationError("Este producto ya existe.")
         return value
-    
+
     def validate_supplier(self, value):
         if not Supplier.objects.filter(supplier_id=value.pk).exists():
             raise serializers.ValidationError("El proveedor especificado no existe.")
@@ -98,7 +93,9 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         if extra:
             raise serializers.ValidationError("Campos no permitidos.")
 
-        read_only_attempted = set(self.initial_data.keys()) & set(self.Meta.read_only_fields)
+        read_only_attempted = set(self.initial_data.keys()) & set(
+            self.Meta.read_only_fields
+        )
         if read_only_attempted:
             raise serializers.ValidationError(
                 f"Campos no modificables: {read_only_attempted}"
@@ -106,7 +103,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         supplier = attrs.get("supplier")
         if supplier is None:
             raise serializers.ValidationError("El proveedor es obligatorio.")
-        
+
         price = attrs.get("unit_price")
         stock = attrs.get("quantity_in_stock")
         if price is not None and stock is not None:
@@ -117,6 +114,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
 
         return attrs
 
+
 # Serializacion de login
 class LoginSerializer(serializers.Serializer):
 
@@ -124,14 +122,11 @@ class LoginSerializer(serializers.Serializer):
         min_length=3,
         max_length=150,
         trim_whitespace=True,
-        validators=[USERNAME_VALIDATOR]
+        validators=[USERNAME_VALIDATOR],
     )
 
     password = serializers.CharField(
-        min_length=8,
-        max_length=128,
-        write_only=True,
-        trim_whitespace=False
+        min_length=8, max_length=128, write_only=True, trim_whitespace=False
     )
 
     def validate_username(self, value):
@@ -148,8 +143,7 @@ class LoginSerializer(serializers.Serializer):
             raise serializers.ValidationError("Campos no permitidos.")
 
         user = authenticate(
-            username=attrs.get("username"),
-            password=attrs.get("password")
+            username=attrs.get("username"), password=attrs.get("password")
         )
 
         if not user or not user.is_active:
@@ -158,6 +152,7 @@ class LoginSerializer(serializers.Serializer):
         attrs["user"] = user
         return attrs
 
+
 # Serializador de verificación TOTP
 class TOTPVerifySerializer(serializers.Serializer):
 
@@ -165,12 +160,11 @@ class TOTPVerifySerializer(serializers.Serializer):
         min_length=3,
         max_length=16,
         trim_whitespace=True,
-        validators=[USERNAME_VALIDATOR]
+        validators=[USERNAME_VALIDATOR],
     )
 
     codigo = serializers.RegexField(
-        regex=r"^\d{6}$",
-        error_messages={"invalid": "Código inválido."}
+        regex=r"^\d{6}$", error_messages={"invalid": "Código inválido."}
     )
 
     def validate_username(self, value):
@@ -194,16 +188,33 @@ class SupplierSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Supplier
-        fields = ('supplier_id', 'name', 'created_at', 'updated_at')
-        read_only_fields = ('supplier_id', 'created_at', 'updated_at')
+        fields = ("supplier_id", "name", "created_at", "updated_at")
+        read_only_fields = ("supplier_id", "created_at", "updated_at")
 
     def validate_name(self, value):
         value = sanitize_text(value)
+
+        if value != value.strip():
+            raise serializers.ValidationError(
+                "El nombre no puede empezar ni terminar con espacios."
+            )
+
+        if not re.match(r"^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s]+$", value):
+            raise serializers.ValidationError(
+                "Solo se permiten letras, números."
+            )
+
+        
+        if value.strip().isdigit():
+            raise serializers.ValidationError("El nombre no puede ser solo números.")
+
+        
         query = Supplier.objects.filter(name__iexact=value)
         if self.instance:
             query = query.exclude(pk=self.instance.pk)
         if query.exists():
             raise serializers.ValidationError("Este proveedor ya existe.")
+
         return value
 
     def validate(self, attrs):
@@ -211,40 +222,36 @@ class SupplierSerializer(serializers.ModelSerializer):
         if extra:
             raise serializers.ValidationError("Campos no permitidos.")
 
-        read_only_attempted = set(self.initial_data.keys()) & set(self.Meta.read_only_fields)
+        read_only_attempted = set(self.initial_data.keys()) & set(
+            self.Meta.read_only_fields
+        )
         if read_only_attempted:
             raise serializers.ValidationError(
                 f"Campos no modificables: {read_only_attempted}"
             )
         return attrs
-    
+
+
 # Serializacion de resenas
 class ReviewInventorySerializer(serializers.ModelSerializer):
 
     product_name = serializers.CharField(source="item.product_name", read_only=True)
 
-    rating = serializers.IntegerField(
-        min_value=1,
-        max_value=5
-    )
+    rating = serializers.IntegerField(min_value=1, max_value=5)
 
-    comment = serializers.CharField(
-        min_length=3,
-        max_length=500,
-        trim_whitespace=True
-    )
+    comment = serializers.CharField(min_length=3, max_length=500, trim_whitespace=True)
 
     class Meta:
         model = ReviewInventory
         fields = (
-            'review_id',
-            'item',
-            'product_name',
-            'rating',
-            'comment',
-            'reviewed_at'
+            "review_id",
+            "item",
+            "product_name",
+            "rating",
+            "comment",
+            "reviewed_at",
         )
-        read_only_fields = ('review_id', 'reviewed_at', 'product_name')
+        read_only_fields = ("review_id", "reviewed_at", "product_name")
 
     def validate_comment(self, value):
         return sanitize_text(value)
@@ -254,7 +261,9 @@ class ReviewInventorySerializer(serializers.ModelSerializer):
         if extra:
             raise serializers.ValidationError("Campos no permitidos.")
 
-        read_only_attempted = set(self.initial_data.keys()) & set(self.Meta.read_only_fields)
+        read_only_attempted = set(self.initial_data.keys()) & set(
+            self.Meta.read_only_fields
+        )
         if read_only_attempted:
             raise serializers.ValidationError(
                 f"Campos no modificables: {read_only_attempted}"
