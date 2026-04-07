@@ -5,7 +5,12 @@ from datetime import timedelta
 from django.utils.dateparse import parse_datetime
 from django.contrib.auth import login
 import base64
-from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle, SupplierCreateThrottle
+from .throttles import (
+    IPRateThrottle,
+    LoginRateThrottle,
+    AuthSessionThrottle,
+    SupplierCreateThrottle,
+)
 from datetime import timedelta
 from .permissions import PermisoInventario, PermisoBulk, PermisoReview
 from .discord_logger import enviar_discord
@@ -28,8 +33,19 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
 from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from rest_framework.throttling import UserRateThrottle
-from .models import InventoryItem, UserTOTP, FailedLoginAttempt, FailedTOTPAttempt, Supplier, ReviewInventory
-from .serializers import InventoryItemSerializer, SupplierSerializer, ReviewInventorySerializer
+from .models import (
+    InventoryItem,
+    UserTOTP,
+    FailedLoginAttempt,
+    FailedTOTPAttempt,
+    Supplier,
+    ReviewInventory,
+)
+from .serializers import (
+    InventoryItemSerializer,
+    SupplierSerializer,
+    ReviewInventorySerializer,
+)
 from .utils.critical_required import requiere_token_critico
 from .utils.critical_token import generar_critical_token
 from django.contrib.sessions.models import Session
@@ -83,7 +99,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         if not user.groups.exists():
             return InventoryItem.objects.none()
 
-        return InventoryItem.objects.select_related('supplier').all() 
+        return InventoryItem.objects.select_related("supplier").all()
 
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -529,16 +545,16 @@ class BulkDeleteView(APIView):
 
         return Response({"message": f"{count} productos eliminados"}, status=200)
 
+
 class SupplierViewSet(viewsets.ModelViewSet):
     serializer_class = SupplierSerializer
     permission_classes = [PermisoInventario]
     throttle_classes = [IPRateThrottle, UserRateThrottle]
-    
-    
+
     def get_throttles(self):
-            if self.action == 'create':
-                return [IPRateThrottle(), SupplierCreateThrottle()]
-            return [IPRateThrottle(), UserRateThrottle()]
+        if self.action == "create":
+            return [IPRateThrottle(), SupplierCreateThrottle()]
+        return [IPRateThrottle(), UserRateThrottle()]
 
     def get_queryset(self):
         user = self.request.user
@@ -593,7 +609,7 @@ class SupplierViewSet(viewsets.ModelViewSet):
         if instance.products.exists():
             return Response(
                 {"error": "No se puede eliminar un proveedor con productos asignados."},
-                status=400
+                status=400,
             )
 
         if request.user.is_authenticated:
@@ -610,8 +626,6 @@ class SupplierViewSet(viewsets.ModelViewSet):
         return Response(status=204)
 
 
-#·---------------------------
-# Tabla de reseñas del inventario
 class ReviewInventoryViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewInventorySerializer
     permission_classes = [PermisoReview]
@@ -645,6 +659,10 @@ class ReviewInventoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
+
+        if not requiere_token_critico(request):
+            return Response({"error": "Requiere verificación crítica"}, status=403)
+
         instance = self.get_object()
 
         if request.user.is_authenticated:
