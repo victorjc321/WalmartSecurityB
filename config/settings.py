@@ -126,8 +126,8 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_THROTTLE_RATES": {
         "anon": "10/minute",
-        "user": "10/minute",
-        "ip": "15/minute",
+        "user": "30/minute",
+        "ip": "20/minute",
         "login": "5/minute",
         "auth_session": "15/minute",
         "supplier_create": "10/hour",

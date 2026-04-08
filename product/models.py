@@ -7,7 +7,7 @@ from datetime import timedelta
 from decimal import Decimal
 import uuid
 from django.db import models
-from django.contrib.auth.models import User
+
 
 class UserTOTP(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
@@ -25,14 +25,14 @@ class InventoryItem(models.Model):
         max_digits=12, decimal_places=2, validators=[MinValueValidator(Decimal("0.00"))]
     )
     quantity_in_stock = models.PositiveIntegerField(validators=[MinValueValidator(0)])
-    
+
     supplier = models.ForeignKey(
-        'Supplier',
+        "Supplier",
         on_delete=models.PROTECT,
-        related_name='products',
-        null=True,        # temporal-----quitar 
-        blank=True,       # temporal-----quitar
-        db_column='supplier_id'
+        related_name="products",
+        null=True,  # temporal-----quitar
+        blank=True,  # temporal-----quitar
+        db_column="supplier_id",
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -43,6 +43,7 @@ class InventoryItem(models.Model):
     class Meta:
         db_table = "inventory_asset"
         ordering = ["-created_at"]
+
 
 class ReviewInventory(models.Model):
     review_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -64,7 +65,7 @@ class ReviewInventory(models.Model):
     class Meta:
         db_table = "inventory_review"
         ordering = ["-reviewed_at"]
-    
+
 
 class BlockedIP(models.Model):
     ip = models.GenericIPAddressField(unique=True)
@@ -137,15 +138,14 @@ class FailedTOTPAttempt(models.Model):
     def __str__(self):
         return f"{self.user.username} - {self.attempts} intentos"
 
-    from django.contrib.auth.models import User
-
 
 class UserSession(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     session_key = models.CharField(max_length=255)
     ip = models.GenericIPAddressField()
     user_agent = models.TextField()
-    created_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_activity = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"{self.user.username} - {self.ip}"
@@ -157,6 +157,7 @@ class UsedCriticalToken(models.Model):
 
     def __str__(self):
         return self.jti
+
 
 class Supplier(models.Model):
     supplier_id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -170,3 +171,33 @@ class Supplier(models.Model):
     class Meta:
         db_table = "supplier"
         ordering = ["-created_at"]
+
+
+class SecurityLog(models.Model):
+    EVENT_CHOICES = [
+        ("LOGIN_SUCCESS", "Login exitoso"),
+        ("LOGIN_FAILED", "Login fallido"),
+        ("LOGOUT", "Logout"),
+        ("SESSION_EXPIRED", "Sesión expirada"),
+        ("RISK_DETECTED", "Riesgo detectado"),
+        ("OTP_FAILED", "OTP fallido"),
+        ("TOKEN_REUSE_ATTACK", "Reuso de token"),
+    ]
+
+    user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    event = models.CharField(max_length=50, choices=EVENT_CHOICES)
+    ip = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(null=True, blank=True)
+    country = models.CharField(max_length=100, null=True, blank=True)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.event} - {self.user} - {self.ip}"
+
+
+class UserRiskProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    risk_score = models.IntegerField(default=0)
+    last_ip = models.GenericIPAddressField(null=True, blank=True)
+    last_user_agent = models.TextField(null=True, blank=True)
+    last_activity = models.DateTimeField(auto_now=True)

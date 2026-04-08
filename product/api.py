@@ -11,7 +11,6 @@ from .throttles import (
     AuthSessionThrottle,
     SupplierCreateThrottle,
 )
-from datetime import timedelta
 from .permissions import PermisoInventario, PermisoBulk, PermisoReview
 from .discord_logger import enviar_discord
 from django.utils.timezone import now
@@ -24,6 +23,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.admin.models import LogEntry, ADDITION, CHANGE, DELETION
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import authenticate
+from rest_framework.exceptions import PermissionDenied
 from django.contrib.auth.models import User
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
@@ -32,6 +32,9 @@ from django.views.decorators.debug import sensitive_variables, sensitive_post_pa
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.exceptions import TokenError
 from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
+from .utils.security_logger import log_security_event
+from .utils.security_analysis import detectar_ataque
+from .utils.risk_engine import calculate_risk
 from rest_framework.throttling import UserRateThrottle
 from .models import (
     InventoryItem,
@@ -108,6 +111,12 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+        risk = calculate_risk(request, request.user)
+        riesgo_historial = detectar_ataque(request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(request, "RISK_DETECTED", request.user)
+            return Response({"error": "Acción bloqueada por seguridad"}, status=403)
 
         data = request.data
 
@@ -139,6 +148,13 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 
     def destroy(self, request, *args, **kwargs):
 
+        risk = calculate_risk(request, request.user)
+        riesgo_historial = detectar_ataque(request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(request, "RISK_DETECTED", request.user)
+            return Response({"error": "Eliminación bloqueada"}, status=403)
+
         if not requiere_token_critico(request):
             return Response({"error": "Requiere verificación crítica"}, status=403)
 
@@ -151,6 +167,13 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         return Response(status=204)
 
     def perform_create(self, serializer):
+        risk = calculate_risk(self.request, self.request.user)
+        riesgo_historial = detectar_ataque(self.request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(self.request, "RISK_DETECTED", self.request.user)
+            raise PermissionDenied("Creación bloqueada por seguridad")
+
         obj = serializer.save()
         if self.request.user.is_authenticated:
             registrar_log(self.request.user, ADDITION, obj)
@@ -187,6 +210,7 @@ def login_view(request):
     user = authenticate(username=username, password=password)
 
     if not user:
+        log_security_event(request, "LOGIN_FAILED")
         attempt.attempts += 1
 
         if attempt.attempts == 5:
@@ -209,6 +233,14 @@ def login_view(request):
             {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
             status=400,
         )
+
+    risk = calculate_risk(request, user)
+
+    riesgo_historial = detectar_ataque(user)
+
+    if risk >= 100 or riesgo_historial >= 80:
+        log_security_event(request, "RISK_DETECTED", user)
+        return Response({"error": "Acceso bloqueado por seguridad"}, status=403)
 
     login(request, user)
 
@@ -276,7 +308,7 @@ def logout_view(request):
 
     if user:
         UserSession.objects.filter(user=user).delete()
-
+        log_security_event(request, "LOGOUT", user)
         logout(request)
 
     response = Response({"message": "Logout exitoso"})
@@ -289,6 +321,7 @@ def logout_view(request):
 
 @api_view(["POST"])
 def session_expired_view(request):
+    log_security_event(request, "SESSION_EXPIRED")
     ip = request.META.get("REMOTE_ADDR")
 
     mensaje = f"""SESIÓN EXPIRADA
@@ -382,6 +415,7 @@ def verificar_totp_view(request):
     totp = pyotp.TOTP(totp_obj.totp_secret)
 
     if not totp.verify(codigo):
+        log_security_event(request, "OTP_FAILED", user)
         attempts += 1
         request.session["otp_attempts"] = attempts
 
@@ -454,6 +488,8 @@ def verificar_totp_view(request):
     mensaje = f"LOGIN 2FA\nUsuario: {user.username}"
     enviar_discord(mensaje, 5763719)
 
+    log_security_event(request, "LOGIN_SUCCESS", user)
+
     return response
 
 
@@ -503,6 +539,9 @@ class RefreshView(APIView):
             return response
 
         except TokenError:
+            user = request.user if request.user.is_authenticated else None
+
+            log_security_event(request, "TOKEN_REUSE_ATTACK", user)
             print("POSIBLE ROBO DE TOKEN DETECTADO")
 
             response = Response({"error": "Sesión comprometida"}, status=401)
@@ -517,6 +556,13 @@ class BulkDeleteView(APIView):
     throttle_classes = [IPRateThrottle, UserRateThrottle]
 
     def delete(self, request):
+
+        risk = calculate_risk(request, request.user)
+        riesgo_historial = detectar_ataque(request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(request, "RISK_DETECTED", request.user)
+            return Response({"error": "Operación bloqueada"}, status=403)
 
         if not requiere_token_critico(request):
             return Response({"error": "Requiere verificación crítica"}, status=403)
@@ -580,6 +626,14 @@ class SupplierViewSet(viewsets.ModelViewSet):
             )
 
     def update(self, request, *args, **kwargs):
+
+        risk = calculate_risk(request, request.user)
+        riesgo_historial = detectar_ataque(request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(request, "RISK_DETECTED", request.user)
+            return Response({"error": "Operación bloqueada"}, status=403)
+
         if not requiere_token_critico(request):
             return Response({"error": "Requiere verificación crítica"}, status=403)
 
@@ -601,6 +655,14 @@ class SupplierViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
+
+        risk = calculate_risk(request, request.user)
+        riesgo_historial = detectar_ataque(request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(request, "RISK_DETECTED", request.user)
+            return Response({"error": "Operación bloqueada"}, status=403)
+
         if not requiere_token_critico(request):
             return Response({"error": "Requiere verificación crítica"}, status=403)
 
@@ -659,6 +721,13 @@ class ReviewInventoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
+
+        risk = calculate_risk(request, request.user)
+        riesgo_historial = detectar_ataque(request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(request, "RISK_DETECTED", request.user)
+            return Response({"error": "Operación bloqueada"}, status=403)
 
         if not requiere_token_critico(request):
             return Response({"error": "Requiere verificación crítica"}, status=403)

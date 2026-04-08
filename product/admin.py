@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.admin.models import LogEntry
 from .models import InventoryItem, Supplier
+from .models import SecurityLog
 
 
 @admin.register(InventoryItem)
@@ -16,8 +17,13 @@ class LogEntryAdmin(admin.ModelAdmin):
     list_filter = ("action_flag", "content_type")
     search_fields = ("user__username", "object_repr")
     readonly_fields = (
-        "action_time", "user", "content_type",
-        "object_id", "object_repr", "action_flag", "change_message"
+        "action_time",
+        "user",
+        "content_type",
+        "object_id",
+        "object_repr",
+        "action_flag",
+        "change_message",
     )
 
     def has_add_permission(self, request):
@@ -32,3 +38,10 @@ class SupplierAdmin(admin.ModelAdmin):
     list_display = ("name", "created_at")
     search_fields = ("name",)
     list_filter = ("created_at",)
+
+
+@admin.register(SecurityLog)
+class SecurityLogAdmin(admin.ModelAdmin):
+    list_display = ("user", "event", "ip", "country", "timestamp")
+    list_filter = ("event", "timestamp")
+    search_fields = ("user__username", "ip")
