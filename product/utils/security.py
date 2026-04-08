@@ -1,4 +1,3 @@
-from product.models import SecurityLog
 import ipaddress
 
 
@@ -23,21 +22,3 @@ def get_client_ip(request):
             pass
 
     return request.META.get("REMOTE_ADDR")
-
-
-def log_security_event(request, event, user=None):
-    try:
-        if not request:
-            return
-
-        ip = get_client_ip(request)
-        user_agent = request.META.get("HTTP_USER_AGENT")
-
-        SecurityLog.objects.create(
-            user=user,
-            event=event,
-            ip=ip,
-            user_agent=user_agent,
-        )
-    except Exception as e:
-        print("Security log error:", e)

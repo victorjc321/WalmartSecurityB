@@ -1,6 +1,7 @@
 from .models import BlockedIP, UserSession
 from django.http import JsonResponse
 from django.contrib.auth import logout
+from .utils.security import get_client_ip
 
 
 class SecurityMiddleware:
@@ -8,7 +9,7 @@ class SecurityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        ip = request.META.get("REMOTE_ADDR")
+        ip = get_client_ip(request)
 
         if BlockedIP.objects.filter(ip=ip, is_active=True).exists():
             return JsonResponse({"error": "IP bloqueada"}, status=403)
@@ -17,7 +18,7 @@ class SecurityMiddleware:
             try:
                 session_db = UserSession.objects.get(user=request.user)
 
-                current_ip = request.META.get("REMOTE_ADDR")
+                current_ip = get_client_ip(request)
                 current_agent = request.META.get("HTTP_USER_AGENT")
 
                 if (

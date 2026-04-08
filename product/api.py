@@ -35,6 +35,7 @@ from .throttles import IPRateThrottle, LoginRateThrottle, AuthSessionThrottle
 from .utils.security_logger import log_security_event
 from .utils.security_analysis import detectar_ataque
 from .utils.risk_engine import calculate_risk
+from .utils.security import get_client_ip
 from rest_framework.throttling import UserRateThrottle
 from .models import (
     InventoryItem,
@@ -184,7 +185,7 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
 @sensitive_variables("password")
 def login_view(request):
     turnstile_token = request.data.get("cf_turnstile_response")
-    ip = request.META.get("REMOTE_ADDR")
+    ip = get_client_ip(request)
 
     if not turnstile_token:
         return Response({"error": "Verificación requerida"}, status=400)
@@ -195,7 +196,7 @@ def login_view(request):
     username = request.data.get("username")
     password = request.data.get("password")
 
-    ip = request.META.get("REMOTE_ADDR")
+    ip = get_client_ip(request)
     attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip)
 
     if attempt.is_currently_blocked():
@@ -322,7 +323,7 @@ def logout_view(request):
 @api_view(["POST"])
 def session_expired_view(request):
     log_security_event(request, "SESSION_EXPIRED")
-    ip = request.META.get("REMOTE_ADDR")
+    ip = get_client_ip(request)
 
     mensaje = f"""SESIÓN EXPIRADA
 
@@ -462,7 +463,7 @@ def verificar_totp_view(request):
         user=user,
         defaults={
             "session_key": request.session.session_key,
-            "ip": request.META.get("REMOTE_ADDR"),
+            "ip": get_client_ip(request),
             "user_agent": request.META.get("HTTP_USER_AGENT"),
         },
     )
