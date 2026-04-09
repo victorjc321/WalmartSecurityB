@@ -179,6 +179,11 @@ class InventoryItemViewSet(viewsets.ModelViewSet):
         if self.request.user.is_authenticated:
             registrar_log(self.request.user, ADDITION, obj)
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["request"] = self.request
+        return context
+
 
 @api_view(["POST"])
 @throttle_classes([IPRateThrottle, LoginRateThrottle])

@@ -40,6 +40,8 @@ USERNAME_VALIDATOR = RegexValidator(
 # Serializador del inventario
 class InventoryItemSerializer(serializers.ModelSerializer):
 
+    item_id = serializers.SerializerMethodField()
+
     supplier_name = serializers.CharField(source="supplier.name", read_only=True)
 
     product_name = serializers.CharField(
@@ -73,6 +75,19 @@ class InventoryItemSerializer(serializers.ModelSerializer):
             "updated_at",
         )
         read_only_fields = ("item_id", "created_at", "updated_at", "supplier_name")
+
+    def get_item_id(self, obj):  # 👈 AQUI
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return "********"
+
+        user = request.user
+
+        if user.groups.filter(name__in=["Admin", "Gerente"]).exists():
+            return str(obj.item_id)
+
+        return "********"
 
     def validate_product_name(self, value):
         value = sanitize_text(value)
@@ -115,7 +130,6 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         return attrs
 
 
-# Serializacion de login
 class LoginSerializer(serializers.Serializer):
 
     username = serializers.CharField(
@@ -153,7 +167,6 @@ class LoginSerializer(serializers.Serializer):
         return attrs
 
 
-# Serializador de verificación TOTP
 class TOTPVerifySerializer(serializers.Serializer):
 
     username = serializers.CharField(
@@ -180,6 +193,8 @@ class TOTPVerifySerializer(serializers.Serializer):
 
 class SupplierSerializer(serializers.ModelSerializer):
 
+    supplier_id = serializers.SerializerMethodField()
+
     name = serializers.CharField(
         min_length=3,
         max_length=20,
@@ -191,6 +206,19 @@ class SupplierSerializer(serializers.ModelSerializer):
         fields = ("supplier_id", "name", "created_at", "updated_at")
         read_only_fields = ("supplier_id", "created_at", "updated_at")
 
+    def get_supplier_id(self, obj):
+        request = self.context.get("request")
+
+        if not request or not request.user.is_authenticated:
+            return "********"
+
+        user = request.user
+
+        if user.groups.filter(name__in=["Admin", "Gerente"]).exists():
+            return str(obj.supplier_id)
+
+        return "********"
+
     def validate_name(self, value):
         value = sanitize_text(value)
 
@@ -200,15 +228,11 @@ class SupplierSerializer(serializers.ModelSerializer):
             )
 
         if not re.match(r"^[a-zA-Z0-9áéíóúÁÉÍÓÚñÑüÜ\s]+$", value):
-            raise serializers.ValidationError(
-                "Solo se permiten letras, números."
-            )
+            raise serializers.ValidationError("Solo se permiten letras, números.")
 
-        
         if value.strip().isdigit():
             raise serializers.ValidationError("El nombre no puede ser solo números.")
 
-        
         query = Supplier.objects.filter(name__iexact=value)
         if self.instance:
             query = query.exclude(pk=self.instance.pk)
