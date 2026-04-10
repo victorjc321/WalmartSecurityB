@@ -258,7 +258,6 @@ class SupplierSerializer(serializers.ModelSerializer):
         return attrs
 
 
-# Serializacion de resenas
 class ReviewInventorySerializer(serializers.ModelSerializer):
 
     product_name = serializers.CharField(source="item.product_name", read_only=True)
@@ -297,21 +296,20 @@ class ReviewInventorySerializer(serializers.ModelSerializer):
 
         return attrs
 
-    def validate_item(self, value):
+    def to_internal_value(self, data):
         request = self.context.get("request")
         user = request.user
+
+        item_value = data.get("item")
 
         if user.groups.filter(name="Empleado").exists():
             signer = Signer()
 
             try:
-                unsigned_id = signer.unsign(value)
+                unsigned_id = signer.unsign(item_value)
             except BadSignature:
-                raise serializers.ValidationError("ID inválido o manipulado.")
+                raise serializers.ValidationError({"item": "ID inválido o manipulado"})
 
-            try:
-                return InventoryItem.objects.get(item_id=unsigned_id)
-            except InventoryItem.DoesNotExist:
-                raise serializers.ValidationError("Producto no encontrado.")
+            data["item"] = unsigned_id
 
-        return value
+        return super().to_internal_value(data)
