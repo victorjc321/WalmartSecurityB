@@ -3,6 +3,7 @@ from .models import InventoryItem, Supplier, ReviewInventory
 from django.core.validators import RegexValidator
 from django.contrib.auth import authenticate
 import unicodedata
+from django.core.signing import Signer, BadSignature
 import re
 
 DANGEROUS_PATTERNS = re.compile(
@@ -76,7 +77,7 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ("item_id", "created_at", "updated_at", "supplier_name")
 
-    def get_item_id(self, obj):  # 👈 AQUI
+    def get_item_id(self, obj):
         request = self.context.get("request")
 
         if not request or not request.user.is_authenticated:
@@ -87,7 +88,8 @@ class InventoryItemSerializer(serializers.ModelSerializer):
         if user.groups.filter(name__in=["Admin", "Gerente"]).exists():
             return str(obj.item_id)
 
-        return "********"
+        signer = Signer()
+        return signer.sign(str(obj.item_id))
 
     def validate_product_name(self, value):
         value = sanitize_text(value)
@@ -294,3 +296,22 @@ class ReviewInventorySerializer(serializers.ModelSerializer):
             )
 
         return attrs
+
+    def validate_item(self, value):
+        request = self.context.get("request")
+        user = request.user
+
+        if user.groups.filter(name="Empleado").exists():
+            signer = Signer()
+
+            try:
+                unsigned_id = signer.unsign(value)
+            except BadSignature:
+                raise serializers.ValidationError("ID inválido o manipulado.")
+
+            try:
+                return InventoryItem.objects.get(item_id=unsigned_id)
+            except InventoryItem.DoesNotExist:
+                raise serializers.ValidationError("Producto no encontrado.")
+
+        return value
