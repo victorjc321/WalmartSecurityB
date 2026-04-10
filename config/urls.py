@@ -14,6 +14,7 @@ from product.api import (
     logout_all_view,
     check_session,
     verify_critical_view,
+    frontend_log_view,
 )
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -34,6 +35,7 @@ urlpatterns = [
     path("api/session-expired/", session_expired_view),
     path("api/mi-rol/", mi_rol_view),
     path("api/verify-critical/", verify_critical_view),
+    path("api/frontend-log/", frontend_log_view),
 ]
 
 if settings.ENVIRONMENT != "production":

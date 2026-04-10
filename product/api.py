@@ -745,3 +745,28 @@ class ReviewInventoryViewSet(viewsets.ModelViewSet):
 
         instance.delete()
         return Response(status=204)
+
+    from rest_framework.decorators import api_view
+
+
+from rest_framework.response import Response
+from .discord_logger import enviar_discord
+
+
+@api_view(["POST"])
+def frontend_log_view(request):
+    data = request.data
+
+    mensaje = f"""
+FRONTEND LOG
+
+Tipo: {data.get('type')}
+Mensaje: {data.get('message')}
+URL: {data.get('url')}
+UserAgent: {data.get('userAgent')}
+IP: {request.META.get('REMOTE_ADDR')}
+"""
+
+    enviar_discord(mensaje, 16753920)
+
+    return Response({"status": "ok"})
