@@ -3,6 +3,7 @@ from django.urls import path, include
 from product.api import mi_rol_view
 from product.api import session_expired_view
 from django.http import JsonResponse
+from django.conf import settings
 from product.api import (
     login_view,
     mi_rol_view,
@@ -27,16 +28,20 @@ urlpatterns = [
     path("api/verificar-totp/", verificar_totp_view),
     path("api/logout/", logout_view),
     path("csrf/", csrf_view),
-    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("refresh/", RefreshView.as_view()),
     path("logout-all/", logout_all_view),
     path("api/check-session/", check_session),
     path("api/session-expired/", session_expired_view),
     path("api/mi-rol/", mi_rol_view),
     path("api/verify-critical/", verify_critical_view),
-    path(
-        "api/docs/",
-        SpectacularSwaggerView.as_view(url_name="schema"),
-        name="swagger-ui",
-    ),
 ]
+
+if settings.ENVIRONMENT != "production":
+    urlpatterns += [
+        path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+        path(
+            "api/docs/",
+            SpectacularSwaggerView.as_view(url_name="schema"),
+            name="swagger-ui",
+        ),
+    ]
