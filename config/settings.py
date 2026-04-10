@@ -229,7 +229,6 @@ CONTENT_SECURITY_POLICY = {
             "'self'",
             "https://cdn.jsdelivr.net",
             "https://challenges.cloudflare.com",
-            "'unsafe-inline'",
         ),
         "style-src": ("'self'", "https://cdn.jsdelivr.net"),
         "img-src": ("'self'", "data:", "https://cdn.jsdelivr.net"),
