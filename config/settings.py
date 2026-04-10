@@ -207,7 +207,6 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 
-# origins permitidos para CORS, en produccion se lee del .env
 CORS_ALLOWED_ORIGINS = os.getenv(
     "CORS_ALLOWED_ORIGINS",
     "https://walmartsecurityf1.pages.dev",
@@ -229,8 +228,13 @@ CONTENT_SECURITY_POLICY = {
             "'self'",
             "https://cdn.jsdelivr.net",
             "https://challenges.cloudflare.com",
+            "'unsafe-inline'",
         ),
-        "style-src": ("'self'", "https://cdn.jsdelivr.net"),
+        "style-src": (
+            "'self'",
+            "https://cdn.jsdelivr.net",
+            "'unsafe-inline'",
+        ),
         "img-src": ("'self'", "data:", "https://cdn.jsdelivr.net"),
         "font-src": ("'self'",),
         "frame-src": (
