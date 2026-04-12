@@ -88,11 +88,14 @@ class BlockedIP(models.Model):
         return True
 
     def __str__(self):
-        return f"{self.ip} - {'ACTIVA' if self.is_active else 'INACTIVA'}"
+        return (
+            f"{self.ip} - {'ACTIVA' if self.is_active else 'INACTIVA'} - {self.reason}"
+        )
 
 
 class FailedLoginAttempt(models.Model):
-    ip = models.GenericIPAddressField(unique=True)
+    ip = models.GenericIPAddressField()
+    username = models.CharField(max_length=150, null=True, blank=True)
     attempts = models.IntegerField(default=0)
     last_attempt = models.DateTimeField(auto_now=True)
     is_blocked = models.BooleanField(default=False)
@@ -102,24 +105,17 @@ class FailedLoginAttempt(models.Model):
         if self.is_blocked and self.blocked_until:
             if timezone.now() >= self.blocked_until:
                 self.is_blocked = False
-                self.attempts = 0
                 self.blocked_until = None
                 self.save()
                 return False
             return True
         return False
 
-    def apply_block(self):
-        if self.attempts >= 7:
-            self.blocked_until = timezone.now() + timedelta(hours=1)
-        elif self.attempts >= 5:
-            self.blocked_until = timezone.now() + timedelta(minutes=30)
-        elif self.attempts >= 3:
-            self.blocked_until = timezone.now() + timedelta(minutes=5)
-        self.is_blocked = True
-
     def __str__(self):
-        return f"{self.ip} - {self.attempts}"
+        return f"{self.ip} | {self.username} | {self.attempts}"
+
+    class Meta:
+        unique_together = ("ip", "username")
 
 
 class FailedTOTPAttempt(models.Model):
@@ -203,6 +199,7 @@ class SecurityLog(models.Model):
     ip = models.GenericIPAddressField(null=True, blank=True)
     user_agent = models.TextField(null=True, blank=True)
     country = models.CharField(max_length=100, null=True, blank=True)
+    extra = models.JSONField(null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

@@ -25,19 +25,22 @@ def get_client_ip(request):
     return request.META.get("REMOTE_ADDR")
 
 
-def log_security_event(request, event, user=None):
+def log_security_event(request, event, user=None, extra=None):
     try:
         if not request:
             return
 
         ip = get_client_ip(request)
         user_agent = request.META.get("HTTP_USER_AGENT")
+        country = request.META.get("HTTP_CF_IPCOUNTRY")
 
         SecurityLog.objects.create(
             user=user,
             event=event,
             ip=ip,
             user_agent=user_agent,
+            extra={"country": country, "path": request.path, **(extra or {})},
         )
+
     except Exception as e:
         print("Security log error:", e)

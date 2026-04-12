@@ -196,15 +196,29 @@ def login_view(request):
         return Response({"error": "Verificación requerida"}, status=400)
 
     if not verificar_turnstile(turnstile_token, ip):
+        log_security_event(
+            request,
+            "RISK_DETECTED",
+            extra={
+                "type": "turnstile_failed",
+                "username": request.data.get("username"),
+            },
+        )
         return Response({"error": "Verificación fallida"}, status=400)
 
-    username = request.data.get("username")
+    username = (request.data.get("username") or "").strip().lower()
     password = request.data.get("password")
 
-    ip = get_client_ip(request)
-    attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip)
+    attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip, username=username)
 
-    if attempt.is_currently_blocked():
+    blocked = attempt.is_currently_blocked()
+
+    if blocked:
+        log_security_event(
+            request,
+            "RISK_DETECTED",
+            extra={"type": "ip_blocked", "username": username},
+        )
         return Response(
             {
                 "error": "Acceso temporalmente restringido",
@@ -216,27 +230,57 @@ def login_view(request):
     user = authenticate(username=username, password=password)
 
     if not user:
-        log_security_event(request, "LOGIN_FAILED")
+        log_security_event(
+            request,
+            "LOGIN_FAILED",
+            extra={"username": username, "reason": "invalid_credentials"},
+        )
         attempt.attempts += 1
 
-        if attempt.attempts == 5:
+        if attempt.attempts == 3:
+            attempt.blocked_until = now() + timedelta(minutes=5)
+            attempt.is_blocked = True
+
+        elif attempt.attempts == 5:
             attempt.blocked_until = now() + timedelta(minutes=10)
             attempt.is_blocked = True
 
-        elif attempt.attempts == 10:
+        elif attempt.attempts == 8:
             attempt.blocked_until = now() + timedelta(minutes=30)
             attempt.is_blocked = True
 
-        elif attempt.attempts == 15:
+        elif attempt.attempts == 12:
             attempt.blocked_until = now() + timedelta(hours=1)
             attempt.is_blocked = True
 
         attempt.save()
 
-        remaining = max(0, 5 - attempt.attempts)
+        if attempt.attempts < 3:
+            remaining = 3 - attempt.attempts
+            warning = "Cuidado: varios intentos fallidos"
+
+        elif attempt.attempts < 5:
+            remaining = 5 - attempt.attempts
+            warning = "Advertencia: estás cerca de un bloqueo"
+
+        elif attempt.attempts < 8:
+            remaining = 8 - attempt.attempts
+            warning = "Riesgo alto: el bloqueo será más largo"
+
+        elif attempt.attempts < 12:
+            remaining = 12 - attempt.attempts
+            warning = "Últimos intentos antes de bloqueo fuerte"
+
+        else:
+            remaining = 0
+            warning = "Bloqueo inminente"
 
         return Response(
-            {"error": "Credenciales incorrectas", "remaining_attempts": remaining},
+            {
+                "error": "Credenciales incorrectas",
+                "remaining_attempts": remaining,
+                "warning": warning,
+            },
             status=400,
         )
 
@@ -249,6 +293,7 @@ def login_view(request):
         return Response({"error": "Acceso bloqueado por seguridad"}, status=403)
 
     login(request, user)
+    log_security_event(request, "LOGIN_SUCCESS", user, extra={"reset_attempts": True})
 
     attempt.attempts = 0
     attempt.is_blocked = False
