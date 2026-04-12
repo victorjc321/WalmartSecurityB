@@ -209,7 +209,10 @@ def login_view(request):
     username = (request.data.get("username") or "").strip().lower()
     password = request.data.get("password")
 
-    attempt, _ = FailedLoginAttempt.objects.get_or_create(ip=ip, username=username)
+    attempt = FailedLoginAttempt.objects.filter(ip=ip, username=username).first()
+
+    if not attempt:
+        attempt = FailedLoginAttempt.objects.create(ip=ip, username=username)
 
     blocked = attempt.is_currently_blocked()
 
@@ -261,11 +264,11 @@ def login_view(request):
 
         elif attempt.attempts < 5:
             remaining = 5 - attempt.attempts
-            warning = "Advertencia: estás cerca de un bloqueo"
+            warning = "Siguiente Bloqueo sera mas largo 10 minutos"
 
         elif attempt.attempts < 8:
             remaining = 8 - attempt.attempts
-            warning = "Riesgo alto: el bloqueo será más largo"
+            warning = "Riesgo alto: el bloqueo de 30 minutos"
 
         elif attempt.attempts < 12:
             remaining = 12 - attempt.attempts
