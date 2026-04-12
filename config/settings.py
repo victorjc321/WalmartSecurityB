@@ -12,6 +12,8 @@ SECRET_KEY = os.getenv("SECRET_KEY")
 
 ENVIRONMENT = os.getenv("DJANGO_ENV", "development")
 
+IPQS_API_KEY = os.getenv("IPQS_API_KEY")
+
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.Argon2PasswordHasher",
     "django.contrib.auth.hashers.PBKDF2PasswordHasher",

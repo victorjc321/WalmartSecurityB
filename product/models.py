@@ -7,6 +7,7 @@ from datetime import timedelta
 from decimal import Decimal
 import uuid
 from django.db import models
+from django.utils.timezone import now
 
 
 class UserTOTP(models.Model):
@@ -69,12 +70,25 @@ class ReviewInventory(models.Model):
 
 class BlockedIP(models.Model):
     ip = models.GenericIPAddressField(unique=True)
-    reason = models.CharField(max_length=255)
+    reason = models.CharField(max_length=255, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_active = models.BooleanField(default=True)
 
+    blocked_until = models.DateTimeField(null=True, blank=True)
+
+    def is_blocked(self):
+        if not self.is_active:
+            return False
+
+        if self.blocked_until and now() >= self.blocked_until:
+            self.is_active = False
+            self.save()
+            return False
+
+        return True
+
     def __str__(self):
-        return self.ip
+        return f"{self.ip} - {'ACTIVA' if self.is_active else 'INACTIVA'}"
 
 
 class FailedLoginAttempt(models.Model):

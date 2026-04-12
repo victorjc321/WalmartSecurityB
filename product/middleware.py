@@ -9,16 +9,23 @@ class SecurityMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+
         ip = get_client_ip(request)
 
-        if BlockedIP.objects.filter(ip=ip, is_active=True).exists():
-            return JsonResponse({"error": "IP bloqueada"}, status=403)
+        blocked = BlockedIP.objects.filter(ip=ip).first()
+
+        if blocked and blocked.is_blocked():
+
+            if request.user.is_authenticated:
+                logout(request)
+
+            return JsonResponse({"error": "IP bloqueada por seguridad"}, status=403)
 
         if hasattr(request, "user") and request.user.is_authenticated:
             try:
                 session_db = UserSession.objects.get(user=request.user)
 
-                current_ip = get_client_ip(request)
+                current_ip = ip
                 current_agent = request.META.get("HTTP_USER_AGENT")
 
                 if (
@@ -33,9 +40,7 @@ class SecurityMiddleware:
                     UserSession.objects.filter(user=user).delete()
 
                     return JsonResponse(
-                        {
-                            "error": "Posible robo de sesión detectado o sesión en otro dispositivo"
-                        },
+                        {"error": "Sesión inválida o posible robo detectado"},
                         status=401,
                     )
 

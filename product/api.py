@@ -764,7 +764,7 @@ Tipo: {data.get('type')}
 Mensaje: {data.get('message')}
 URL: {data.get('url')}
 UserAgent: {data.get('userAgent')}
-IP: {request.META.get('REMOTE_ADDR')}
+IP: {get_client_ip(request)}
 """
 
     enviar_discord(mensaje, 16753920)
