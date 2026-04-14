@@ -3,6 +3,7 @@ from django.urls import path, include
 from product.api import mi_rol_view
 from product.api import session_expired_view
 from django.http import JsonResponse
+from product.honeypots import fake_admin, fake_env
 from django.conf import settings
 from product.api import (
     login_view,
@@ -36,6 +37,9 @@ urlpatterns = [
     path("api/mi-rol/", mi_rol_view),
     path("api/verify-critical/", verify_critical_view),
     path("api/frontend-log/", frontend_log_view),
+    path("api/admin-panel/", fake_admin),
+    path("api/.env", fake_env),
+    path("api/debug/", fake_admin),
 ]
 
 if settings.ENVIRONMENT != "production":

@@ -214,12 +214,21 @@ CORS_ALLOWED_ORIGINS = os.getenv(
     "https://walmartsecurityf1.pages.dev",
 ).split(",")
 
+SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = "require-corp"
+
+SECURE_PERMISSIONS_POLICY = {
+    "geolocation": [],
+    "camera": [],
+    "microphone": [],
+    "payment": [],
+}
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
+SECURE_CROSS_ORIGIN_EMBEDDER_POLICY = "require-corp"
 SECURE_CROSS_ORIGIN_RESOURCE_POLICY = "same-origin"
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 

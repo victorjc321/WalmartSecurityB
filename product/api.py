@@ -258,30 +258,18 @@ def login_view(request):
 
         attempt.save()
 
-        if attempt.attempts < 3:
-            max_attempts = 3
-            level = "bloqueo de 5 minutos"
-
-        elif attempt.attempts < 5:
-            max_attempts = 5
-            level = "bloqueo de 10 minutos"
-
-        elif attempt.attempts < 8:
-            max_attempts = 8
-            level = "bloqueo de 30 minutos"
-
-        elif attempt.attempts < 12:
-            max_attempts = 12
-            level = "bloqueo de 1 hora"
-
+        if attempt.attempts <= 2:
+            level = "low"
+        elif attempt.attempts <= 4:
+            level = "medium"
         else:
-            max_attempts = attempt.attempts
-            level = "bloqueo máximo"
+            level = "high"
 
         return Response(
             {
-                "error": f"Intento {attempt.attempts} de {max_attempts}",
-                "warning": f"Si fallas, se aplicará {level}",
+                "error": "Credenciales incorrectas",
+                "attempt": attempt.attempts,
+                "level": level,
             },
             status=400,
         )

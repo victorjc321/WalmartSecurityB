@@ -49,6 +49,12 @@ class SecurityMiddleware:
 
         response = self.get_response(request)
 
+        response["Permissions-Policy"] = (
+            "geolocation=(), camera=(), microphone=(), payment=()"
+        )
+
+        response["X-Permitted-Cross-Domain-Policies"] = "none"
+
         if hasattr(response, "__setitem__") and request.path.startswith("/api/"):
             response["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
             response["Pragma"] = "no-cache"
