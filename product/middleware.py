@@ -2,7 +2,6 @@ from .models import BlockedIP, UserSession
 from django.http import JsonResponse
 from django.contrib.auth import logout
 from .utils.security import get_client_ip
-from .models import SecurityAcceptance
 
 
 class SecurityMiddleware:
@@ -21,9 +20,6 @@ class SecurityMiddleware:
                 logout(request)
 
             return JsonResponse({"error": "IP bloqueada por seguridad"}, status=403)
-
-        if request.path == "/api/accept-security/":
-            return self.get_response(request)
 
         if hasattr(request, "user") and request.user.is_authenticated:
             try:
@@ -50,12 +46,6 @@ class SecurityMiddleware:
 
             except UserSession.DoesNotExist:
                 pass
-
-            if not SecurityAcceptance.objects.filter(user=request.user).exists():
-                return JsonResponse(
-                    {"error": "Debes aceptar las políticas de seguridad"},
-                    status=403,
-                )
 
         response = self.get_response(request)
 
