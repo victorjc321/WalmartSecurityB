@@ -752,6 +752,33 @@ class ReviewInventoryViewSet(viewsets.ModelViewSet):
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
+
+        risk = calculate_risk(request, request.user)
+        riesgo_historial = detectar_ataque(request.user)
+
+        if risk >= 80 or riesgo_historial >= 80:
+            log_security_event(request, "RISK_DETECTED", request.user)
+            return Response({"error": "Operación bloqueada"}, status=403)
+
+        data = request.data
+
+        cambio_critico = False
+
+        if "comment" in data:
+            if data["comment"].strip() != instance.comment.strip():
+                cambio_critico = True
+
+        if "rating" in data:
+            try:
+                if int(data["rating"]) != instance.rating:
+                    cambio_critico = True
+            except:
+                pass
+
+        if cambio_critico:
+            if not requiere_token_critico(request):
+                return Response({"error": "Requiere verificación crítica"}, status=403)
+
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         obj = serializer.save()
