@@ -16,6 +16,7 @@ from product.api import (
     check_session,
     verify_critical_view,
     frontend_log_view,
+    accept_security_view,
 )
 from drf_spectacular.views import (
     SpectacularAPIView,
@@ -40,6 +41,7 @@ urlpatterns = [
     path("api/admin-panel/", fake_admin),
     path("api/.env", fake_env),
     path("api/debug/", fake_admin),
+    path("api/accept-security/", accept_security_view),
 ]
 
 if settings.ENVIRONMENT != "production":

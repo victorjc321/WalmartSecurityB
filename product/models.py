@@ -212,3 +212,13 @@ class UserRiskProfile(models.Model):
     last_ip = models.GenericIPAddressField(null=True, blank=True)
     last_user_agent = models.TextField(null=True, blank=True)
     last_activity = models.DateTimeField(auto_now=True)
+
+
+class SecurityAcceptance(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    accepted_at = models.DateTimeField(auto_now_add=True)
+    ip = models.GenericIPAddressField()
+    user_agent = models.TextField()
+
+    def __str__(self):
+        return f"{self.user.username} - accepted"

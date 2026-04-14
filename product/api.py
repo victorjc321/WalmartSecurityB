@@ -44,6 +44,7 @@ from .models import (
     FailedTOTPAttempt,
     Supplier,
     ReviewInventory,
+    SecurityAcceptance,
 )
 from .serializers import (
     InventoryItemSerializer,
@@ -832,3 +833,19 @@ IP: {get_client_ip(request)}
     enviar_discord(mensaje, 16753920)
 
     return Response({"status": "ok"})
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def accept_security_view(request):
+    user = request.user
+
+    SecurityAcceptance.objects.update_or_create(
+        user=user,
+        defaults={
+            "ip": get_client_ip(request),
+            "user_agent": request.META.get("HTTP_USER_AGENT"),
+        },
+    )
+
+    return Response({"message": "Aceptado"})
