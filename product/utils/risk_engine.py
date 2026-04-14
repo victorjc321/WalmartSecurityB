@@ -44,7 +44,9 @@ def calculate_risk(request, user):
             risk += 30
 
     try:
-        failed = FailedLoginAttempt.objects.get(ip=ip)
+        failed = (
+            FailedLoginAttempt.objects.filter(ip=ip).order_by("-last_attempt").first()
+        )
         if failed.attempts >= 3:
             risk += 30
     except FailedLoginAttempt.DoesNotExist:
